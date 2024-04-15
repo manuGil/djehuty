@@ -22,6 +22,16 @@ try:
 except (ImportError, ModuleNotFoundError):
     SAML2_DEPENDENCY_LOADED = False
 
+PYVIPS_ERROR_MESSAGE = None
+try:
+    import pyvips
+    PYVIPS_DEPENDENCY_LOADED = True
+except (ImportError, ModuleNotFoundError):
+    PYVIPS_DEPENDENCY_LOADED = False
+except OSError as pyvips_oserror_message:
+    PYVIPS_DEPENDENCY_LOADED = False
+    PYVIPS_ERROR_MESSAGE = pyvips_oserror_message
+
 # The 'uwsgi' module only needs to be available when deploying using uwsgi.
 # To catch potential run-time problems early on in the situation that the
 # uwsgi module is required, we set UWSGI_DEPENDENCY_LOADED here without
@@ -587,6 +597,9 @@ def read_configuration_file (server, config_file, address, port, state_graph,
         server.allow_crawlers = read_boolean_value (xml_root, "allow-crawlers",
                                                     server.allow_crawlers, logger)
 
+        server.enable_iiif = read_boolean_value (xml_root, "enable-iiif",
+                                                 server.enable_iiif, logger)
+
         ssi_psk = config_value (xml_root, "ssi-psk")
         if ssi_psk is not None:
             ssi_psk = ssi_psk.replace(" ", "").replace("\n", "").replace("\r", "").replace("\t", "")
@@ -1005,6 +1018,7 @@ def main (address=None, port=None, state_graph=None, storage=None,
                 if server.in_production:
                     raise DependencyNotAvailable
 
+
             if server.orcid_client_id is not None and server.orcid_read_public_token is None:
                 if server.obtain_orcid_read_public_token ():
                     logger.info ("Obtained read-public token from ORCID.")
@@ -1023,6 +1037,20 @@ def main (address=None, port=None, state_graph=None, storage=None,
             logger.info ("Secondary storage path:  %s", server.db.secondary_storage)
             logger.info ("Cache storage path:      %s", server.db.cache.storage)
             logger.info ("Static pages loaded:     %s", len(server.static_pages))
+
+            if server.enable_iiif and not PYVIPS_DEPENDENCY_LOADED:
+                logger.error ("Dependency 'pyvips' is required for IIIF.")
+                if PYVIPS_ERROR_MESSAGE is not None:
+                    logging.error ("Loading 'pyvips' failed with:\n---\n%s\n---",
+                                   PYVIPS_ERROR_MESSAGE)
+                raise DependencyNotAvailable
+
+            logger.info ("SPARQL endpoint:  %s.", server.db.endpoint)
+            logger.info ("SPARQL update_endpoint:  %s.", server.db.update_endpoint)
+            logger.info ("State graph:  %s.", server.db.state_graph)
+            logger.info ("Storage path: %s.", server.db.storage)
+            logger.info ("Secondary storage path: %s.", server.db.secondary_storage)
+            logger.info ("Cache storage path: %s.", server.db.cache.storage)
             logger.info ("Running on %s", server.base_url)
 
             if server.identity_provider is not None:
