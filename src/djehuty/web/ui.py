@@ -125,6 +125,28 @@ def read_storage_locations (server, xml_root):
 
     return None
 
+def read_groups_configuration (server, xml_root, logger):
+    """Read groups information from XML_ROOT."""
+
+    groups = xml_root.find ("groups")
+    if not groups:
+        return None
+
+    output = []
+    for group in groups:
+        if group.tag != "group":
+            continue
+        logger.info ("Adding group: %s", group.attrib.get("name"))
+        server.db.groups.append({
+            "id":                   group.attrib.get("id"),
+            "parent_id":            group.attrib.get("parent_id"),
+            "name":                 group.attrib.get("name"),
+            "association_criteria": group.attrib.get("domain"),
+            "is_featured":          group.attrib.get("is_featured")
+        })
+
+    return None
+
 def read_quotas_configuration (server, xml_root):
     """Read quota information from XML_ROOT."""
 
@@ -714,6 +736,7 @@ def read_configuration_file (server, config_file, address, port, state_graph,
         read_storage_locations (server, xml_root)
         read_quotas_configuration (server, xml_root)
         read_colors_configuration (server, xml_root)
+        read_groups_configuration (server, xml_root, logger)
 
         for include_element in xml_root.iter('include'):
             include    = include_element.text
@@ -1058,6 +1081,9 @@ def main (address=None, port=None, state_graph=None, storage=None,
 
                     if not rdf_store.insert_static_triplets ():
                         logger.error ("Failed to gather static triplets")
+
+                    for group in server.db.groups:
+                        rdf_store.insert_institution_group (group)
 
                     if server.db.add_triples_from_graph (rdf_store.store):
                         logger.info ("Initialization completed.")

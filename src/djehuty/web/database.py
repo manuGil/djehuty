@@ -42,6 +42,7 @@ class SparqlInterface:
         self.sparql_is_up = False
         self.enable_query_audit_log = False
         self.account_quotas = {}
+        self.groups         = []
         self.group_quotas   = {}
         self.default_quota  = 5000000000
         self.store          = None
