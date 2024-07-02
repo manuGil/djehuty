@@ -356,14 +356,9 @@ table#files tbody tr td:nth-child(3) { width: 15px; text-align: right; }
 <label>Group</label><span class="required-field"> &#8727;</span>
 <div id="groups-wrapper">
 {%- for group in groups: %}
-<h4>{{group.name}}</h4>
 <div id="subgroups_{{group.id}}" class="subgroup-wrapper">
 <input class="subitem-checkbox" type="radio" name="groups" value="{{group.id}}" id="group_{{group.id}}" {% if account.group_id == group.id: %}checked="checked"{% endif %}><!--
 --><label class="subitem-label no-head" for="group_{{group.id}}">{{group.name}}</label><br>
-{%- for sub in group.subgroups: %}
-<input class="subitem-checkbox" type="radio" name="groups" value="{{sub.id}}" id="group_{{sub.id}}"><!--
---><label class="subitem-label no-head" for="group_{{sub.id}}">{{sub.name}}</label><br>
-{%- endfor %}
 </div>
 {%- endfor %}
 </div>

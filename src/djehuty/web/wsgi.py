@@ -1072,25 +1072,10 @@ class ApiServer:
 
     def __groups_for_account (self, account):
         """Gathers groups for an account record."""
-        try:
-            groups = None
-            if "group_id" in account:
-                groups = self.db.group (group_id = account["group_id"])
-            else:
-                # The parent_id was pre-determined by Figshare.
-                groups = self.db.group (parent_id = 28585,
-                                        order_direction = "asc",
-                                        order = "id")
+        if "group_id" in account:
+            return self.db.group (group_id = account["group_id"])
 
-                for index, _ in enumerate(groups):
-                    groups[index]["subgroups"] = self.db.group (
-                        parent_id = groups[index]["id"],
-                        order_direction = "asc",
-                        order = "id")
-
-            return groups
-        except (KeyError, IndexError):
-            return None
+        return self.db.group (order_direction="asc", order="name")
 
     def log_access_using_x_forwarded_for (self, request):
         """Log interactions using the X-Forwarded-For header."""
