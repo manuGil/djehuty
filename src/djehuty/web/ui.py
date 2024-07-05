@@ -352,8 +352,22 @@ def setup_saml_service_provider (server, logger):
         else:
             logger.error ("Failed to create '%s'.", saml_cache_dir)
 
+def read_group_configuration (server, xml_root, logger):
+    """Read the group configuration from XML_ROOT."""
+    groups = xml_root.find("groups")
+    if not groups:
+        return None
+
+    # lookup table tussen email adres en group naam dict {key:value} = {mail:group}
+    for group in groups:
+        #group_name = group.attrib["name"]
+        group_id = group.attrib["id"]
+        for account in group:
+            server.db.groups[account.attrib["email"].lower()]=group_id
+
+
 def read_privilege_configuration (server, xml_root, logger):
-    """Read the privileges configureation from XML_ROOT."""
+    """Read the privileges configuration from XML_ROOT."""
     privileges = xml_root.find("privileges")
     if not privileges:
         return None
@@ -374,7 +388,7 @@ def read_privilege_configuration (server, xml_root, logger):
                 "may_review_integrity": bool(int(config_value (account, "may-review-integrity", None, False))),
                 "may_process_feedback": bool(int(config_value (account, "may-process-feedback", None, False))),
                 "may_receive_email_notifications": bool(int(config_value (account, "may-receive-email-notifications", None, True))),
-                "orcid":           orcid
+                "orcid":           orcid,
             }
 
             ## The "needs_2fa" property is set to True when the user has any
@@ -710,6 +724,8 @@ def read_configuration_file (server, config_file, address, port, state_graph,
         read_email_configuration (server, xml_root, logger)
         read_saml_configuration (server, xml_root, logger)
         read_automatic_login_configuration (server, xml_root)
+        logger.info("EN NOE?")
+        read_group_configuration(server, xml_root, logger)
         read_privilege_configuration (server, xml_root, logger)
         read_storage_locations (server, xml_root)
         read_quotas_configuration (server, xml_root)
@@ -1072,6 +1088,9 @@ def main (address=None, port=None, state_graph=None, storage=None,
                     logger.warning (("Skipping initialization of the database "
                                      "because it has been initialized before."))
                     logger.warning ("Remove '%s' and restart to initialize the database.", lock_file)
+
+        server.db.translate_email_to_uuid()
+        logging.info ("Groups werken: %s", server.db.groups)
 
         run_simple (config["address"], config["port"], server,
                     threaded=(config["maximum_workers"] <= 1),
