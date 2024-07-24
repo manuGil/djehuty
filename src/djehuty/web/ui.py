@@ -1009,9 +1009,9 @@ def main (address=None, port=None, state_graph=None, storage=None,
 
         server.db.setup_sparql_endpoint ()
         server.db.disable_collaboration = server.disable_collaboration
-        #if not inside_reload:
-         #   server.db.delete_inferred_groups()
-          #  read_group_configuration(server, logger, config_files)
+        if not inside_reload:
+            server.db.delete_inferred_groups()
+            read_group_configuration(server, logger, config_files)
 
 
         if apply_transactions is not None:
