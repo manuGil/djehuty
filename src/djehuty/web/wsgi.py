@@ -2448,6 +2448,7 @@ class ApiServer:
                                                          account_uuid,
                                                          metadata["read"],
                                                          metadata["edit"],
+                                                         False,
                                                          data["read"],
                                                          data["edit"],
                                                          data["remove"],
@@ -2506,7 +2507,7 @@ class ApiServer:
             if error_response is not None:
                 return error_response
 
-            if self.db.groups[collaborator_uuid]["is_supervisor"]:
+            if value_or(value_or(self.db.groups, collaborator_uuid, None), "is_supervisor", False):
                 return self.error_403 (request)
 
             if self.db.remove_collaborator (dataset["uuid"], collaborator_uuid) is None:
