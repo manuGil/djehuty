@@ -391,13 +391,38 @@ class SparqlInterface:
 
         return filters
 
+    def __search_query_to_sparql_filters_v3 (self, search_query):
+        """
+        Procedure to parse v3 search query and return SPARQL FILTER statements.
+        """
+        search_for = search_query["search_for"] # list
+        operator   = search_query["operator"]   # str
+        scopes     = search_query["scope"]      # list
+        andgate    = operator == "AND"
+
+        if not search_for:
+            return ""
+
+        filters = "FILTER ("
+        for scope in scopes:
+            filters += "("
+            for word in search_for:
+                filters += "("
+                filters += rdf.sparql_contains_filter(scope, word, andgate=andgate,
+                                                      decapsulate=True)
+                filters += " ) && "
+            filters = filters[:-4] + " ) || "
+        filters = filters[:-4] + " )\n"
+
+        return filters
+
     def datasets (self, account_uuid=None, categories=None, collection_uri=None,
                   container_uuid=None, dataset_id=None, dataset_uuid=None, doi=None,
                   exclude_ids=None, groups=None, handle=None, institution=None,
                   is_latest=False, item_type=None, limit=None, modified_since=None,
                   offset=None, order=None, order_direction=None, published_since=None,
                   resource_doi=None, return_count=False, search_for=None,
-                  search_format=False, version=None, search_scope=None, licenses=None,
+                  search_format=False, version=None, licenses=None,
                   is_published=True, is_under_review=None, git_uuid=None,
                   private_link_id_string=None, use_cache=True, is_restricted=None,
                   is_embargoed=None, is_software=None, organizations=None):
@@ -419,14 +444,13 @@ class SparqlInterface:
         filters += rdf.sparql_in_filter ("group_id",    groups)
         filters += rdf.sparql_in_filter ("dataset_id", exclude_ids, negate=True)
         filters += rdf.sparql_in_filter ("license_id", licenses)
-
         filters += rdf.sparql_contains_filter("organizations", organizations)
-        filters += rdf.sparql_contains_filter("format", search_format)
 
-        if isinstance (search_for, dict):
+        if isinstance (search_for, list):
             filters += self.__search_query_to_sparql_filters_v2 (search_for, search_format)
-        else:
-            filters += rdf.sparql_contains_filter(search_scope, search_for)
+        elif isinstance (search_for, dict):
+            filters += self.__search_query_to_sparql_filters_v3 (search_for)
+            filters += rdf.sparql_contains_filter("format", search_format)
 
         if is_software is not None:
             if is_software:
@@ -2521,6 +2545,16 @@ class SparqlInterface:
         })
         return self.__run_logged_query (query)
 
+    def dataset_update_seen_by_reviewer (self, dataset_uuid):
+        """Sets the last_seen_by_reviewer property to the current timestamp."""
+
+        current_time = datetime.strftime (datetime.now(), "%Y-%m-%dT%H:%M:%S")
+        query = self.__query_from_template ("update_seen_by_reviewer", {
+            "timestamp": current_time,
+            "dataset_uuid": dataset_uuid
+        })
+        return self.__run_logged_query (query)
+
     def insert_collection (self, title,
                            account_uuid,
                            collection_id=None,
@@ -3105,7 +3139,11 @@ class SparqlInterface:
                 self.log.info ("Account for %s already exists.", email)
                 continue
 
-            account_uuid = self.insert_account (email=email)
+            first_name   = self.privileges[email]["first_name"]
+            last_name    = self.privileges[email]["last_name"]
+            account_uuid = self.insert_account (email      = email,
+                                                first_name = first_name,
+                                                last_name  = last_name)
             if not account_uuid:
                 self.log.error ("Creating account for %s failed.", email)
                 continue
@@ -3118,6 +3156,8 @@ class SparqlInterface:
 
             author_uuid = self.insert_author (
                 email        = email,
+                first_name   = first_name,
+                last_name    = last_name,
                 account_uuid = account_uuid,
                 orcid_id     = orcid,
                 is_active    = True,
@@ -3356,6 +3396,18 @@ class SparqlInterface:
         })
 
         return self.__run_query (query, query, "explorer_property_types")
+
+    def mark_state_graph_as_initialized (self):
+        """Inserts the triplet that marks the graph as initialized."""
+        query = ((f'INSERT {{ GRAPH <{self.state_graph}> {{ <this> '
+                  f'<{rdf.DJHT["initialized"]}> "true"^^<{XSD.boolean}> }} }}'))
+        return self.__run_query (query)
+
+    def state_graph_is_initialized (self):
+        """"Returns True of the state-graph is already initialized."""
+        query = ((f'ASK {{ GRAPH <{self.state_graph}> {{ <this> '
+                  f'<{rdf.DJHT["initialized"]}> "true"^^<{XSD.boolean}> }} }}'))
+        return self.__run_query (query)
 
     def add_triples_from_graph (self, graph):
         """Inserts triples from GRAPH into the state graph."""

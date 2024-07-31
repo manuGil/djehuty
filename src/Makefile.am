@@ -176,7 +176,6 @@ EXTRA_RESOURCES =                                                             \
     djehuty/web/resources/sparql_templates/reviews.sparql                     \
     djehuty/web/resources/sparql_templates/root_categories.sparql             \
     djehuty/web/resources/sparql_templates/search_tags.sparql                 \
-    djehuty/web/resources/sparql_templates/statistics.sparql                  \
     djehuty/web/resources/sparql_templates/statistics_authors.sparql          \
     djehuty/web/resources/sparql_templates/statistics_collections.sparql      \
     djehuty/web/resources/sparql_templates/statistics_datalink.sparql         \
@@ -197,6 +196,7 @@ EXTRA_RESOURCES =                                                             \
     djehuty/web/resources/sparql_templates/update_private_link.sparql         \
     djehuty/web/resources/sparql_templates/update_quota_request.sparql        \
     djehuty/web/resources/sparql_templates/update_review.sparql               \
+    djehuty/web/resources/sparql_templates/update_seen_by_reviewer.sparql     \
     djehuty/web/resources/sparql_templates/update_session.sparql              \
     djehuty/web/resources/sparql_templates/update_view_and_download_counts.sparql \
     djehuty/web/resources/static/css/dropzone.min.css                         \

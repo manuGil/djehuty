@@ -375,6 +375,7 @@ class ApiServer:
             ## ----------------------------------------------------------------
             R("/v3/admin/files-integrity-statistics",                            self.api_v3_admin_files_integrity_statistics),
             R("/v3/admin/accounts/clear-cache",                                  self.api_v3_admin_accounts_clear_cache),
+            R("/v3/admin/reviews/clear-cache",                                   self.api_v3_admin_reviews_clear_cache),
 
             ## ----------------------------------------------------------------
             ## GIT HTTP API
@@ -1666,6 +1667,19 @@ class ApiServer:
                             return self.error_500()
                         self.log.access ("Account %s created via SAML.", account_uuid) #  pylint: disable=no-member
 
+                    authors = self.db.authors (account_uuid=account_uuid, limit = 1)
+                    if not value_or (authors, 0, True):
+                        author_uuid = self.db.insert_author (
+                            account_uuid = account_uuid,
+                            first_name   = value_or_none (saml_record, "first_name"),
+                            last_name    = value_or_none (saml_record, "last_name"),
+                            full_name    = value_or_none (saml_record, "common_name"),
+                            email        = saml_record["email"],
+                            is_active    = True,
+                            is_public    = True)
+                        self.log.info ("Created author record %s for account %s.",
+                                       author_uuid, account_uuid)
+
                 except TypeError:
                     pass
         else:
@@ -1731,10 +1745,10 @@ class ApiServer:
     def ui_review_impersonate_to_dataset (self, request, dataset_id):
         """Implements /review/goto-dataset/<id>."""
 
-        handler = self.default_authenticated_error_handling (request, "GET", "text/html",
-                                                             self.db.may_impersonate)
-        if isinstance (handler, Response):
-            return handler
+        account_uuid = self.default_authenticated_error_handling (request, "GET", "text/html",
+                                                                  self.db.may_impersonate)
+        if isinstance (account_uuid, Response):
+            return account_uuid
 
         dataset = None
         try:
@@ -1746,6 +1760,14 @@ class ApiServer:
 
         if dataset is None:
             return self.error_403 (request)
+
+        try:
+            review = self.db.reviews (dataset_uri = dataset["uri"])[0]
+            assigned_uuid = uri_to_uuid (review["assigned_to"])
+            if account_uuid == assigned_uuid:
+                self.db.dataset_update_seen_by_reviewer (dataset["uuid"])
+        except (TypeError, IndexError):
+            pass
 
         # Add a secondary cookie to go back to at one point.
         response = redirect (f"/my/datasets/{dataset['container_uuid']}/edit", code=302)
@@ -3249,7 +3271,7 @@ class ApiServer:
             ## For retracted datasets we display a different error page.
             if dataset is None:
                 dataset = self.__dataset_by_id_or_uri (dataset_id, is_published=None, is_latest=None)
-                if dataset is not None and dataset["is_public"] == 0:
+                if dataset is not None and value_or (dataset, "is_public", 1) == 0:
                     return self.error_410 (request)
                 return self.error_404 (request)
 
@@ -3464,7 +3486,11 @@ class ApiServer:
             else:
                 collection = self.__collection_by_id_or_uri (collection_id, is_published=True, is_latest=True)
 
+        # For retracted collections we display a different error page.
         if collection is None:
+            collection = self.__collection_by_id_or_uri (collection_id, is_published=None, is_latest=None)
+            if collection is not None and value_or (collection, "is_public", 1) == 0:
+                return self.error_410 (request)
             return self.error_404 (request)
 
         container_uuid = collection["container_uuid"]
@@ -3856,7 +3882,12 @@ class ApiServer:
                                 "No files associated with this dataset")
                 return self.error_404 (request)
 
-            zipfly_object = zipfly.ZipFly(paths = file_paths)
+            try:
+                zipfly_object = zipfly.ZipFly(paths = file_paths)
+            except TypeError:
+                self.log.error ("Error in zipping files: %s", file_paths)
+                return self.error_404 (request)
+
             writer = zipfly_object.generator()
             response = self.response (writer, mimetype="application/zip")
 
@@ -4403,8 +4434,22 @@ class ApiServer:
                     agreed_to_publish = validator.boolean_value (record, "agreed_to_publish", False, False),
                     categories      = validator.array_value   (record, "categories"),
                 )
+
+                if self.__is_reviewing (request):
+                    try:
+                        reviewer_account = self.db.account_by_session_token (self.__impersonator_token (request))
+                        review = self.db.reviews (dataset_uri = dataset["uri"])[0]
+                        assigned_uuid = uri_to_uuid (review["assigned_to"])
+                        if reviewer_account["uuid"] == assigned_uuid:
+                            self.db.dataset_update_seen_by_reviewer (dataset["uuid"])
+                    except (TypeError, IndexError):
+                        pass
+
                 if not result:
                     return self.error_500()
+
+                if value_or (dataset, "is_under_review", False):
+                    self.db.cache.invalidate_by_prefix ("reviews")
 
                 return self.respond_205()
 
@@ -6414,11 +6459,12 @@ class ApiServer:
             record["handle"]          = self.get_parameter (parameters, "handle")
             record["search_for"]      = self.get_parameter (parameters, "search_for")
             record["search_format"]   = self.get_parameter (parameters, "search_format")
-            record["search_scope"]    = self.get_parameter (parameters, "search_scope")
             record["licenses"]        = self.get_parameter (parameters, "licenses")
             record["organizations"]   = self.get_parameter (parameters, "organizations")
             record["categories"]      = self.get_parameter (parameters, "categories")
             record["is_latest"]       = self.get_parameter (parameters, "is_latest")
+            search_operator           = self.get_parameter (parameters, "search_operator")
+            search_scope              = self.get_parameter (parameters, "search_scope")
 
             offset, limit = self.__paging_offset_and_limit (parameters)
             record["offset"] = offset
@@ -6434,7 +6480,6 @@ class ApiServer:
             validator.string_value   (record, "doi",             maximum_length=255)
             validator.string_value   (record, "handle",          maximum_length=255)
             validator.string_value   (record, "search_for",      maximum_length=1024)
-            validator.string_value   (record, "organizations",   maximum_length=255)
             validator.boolean_value  (record, "is_latest")
 
             if record["groups"] is not None:
@@ -6443,14 +6488,23 @@ class ApiServer:
                     record["groups"][index] = validator.integer_value (record["groups"], index)
 
             if record["search_format"] is not None:
-                validator.array_value    (record, "search_format")
-                for index, _ in enumerate(record["search_format"]):
-                    record["search_format"][index] = validator.string_value (record["search_format"], index, maximum_length=255)
+                record["search_format"] = validator.search_filters({"format": record["search_format"]})
 
-            if record["search_scope"] is not None:
-                validator.array_value    (record, "search_scope")
-                for index, _ in enumerate(record["search_scope"]):
-                    record["search_scope"][index] = validator.string_value (record["search_scope"], index, maximum_length=12)
+            if search_operator is not None:
+                search_operator = validator.search_filters({"operator": search_operator})
+
+            if search_scope is not None:
+                search_scope = validator.search_filters({"scope": search_scope})
+
+            if record["search_for"] is not None:
+                search_tokens = re.findall(r'[^" ]+|"[^"]+"|\([^)]+\)', record["search_for"])
+                search_tokens = [s.strip('"') for s in search_tokens]
+                record["search_for"] = { "operator": search_operator,
+                                         "search_for": search_tokens,
+                                         "scope": search_scope}
+
+            if record["organizations"] is not None:
+                record["organizations"] = validator.search_filters("organizations", record["organizations"])
 
             if record["licenses"] is not None:
                 validator.array_value    (record, "licenses")
@@ -8389,18 +8443,23 @@ class ApiServer:
 
         return self.respond_204 ()
 
-    def api_v3_admin_accounts_clear_cache (self, request):
-        """Implements /v3/admin/accounts/clear-cache."""
-
+    def __api_v3_admin_clear_cache (self, request, key):
         handler = self.default_authenticated_error_handling (request, "GET", "application/json",
                                                              self.db.may_administer)
         if isinstance (handler, Response):
             return handler
 
-        self.log.info ("Invalidating accounts caches.")
-        self.db.cache.invalidate_by_prefix ("accounts")
-
+        self.log.info ("Invalidating %s caches.", key)
+        self.db.cache.invalidate_by_prefix (key)
         return self.respond_204 ()
+
+    def api_v3_admin_accounts_clear_cache (self, request):
+        """Implements /v3/admin/accounts/clear-cache."""
+        return self.__api_v3_admin_clear_cache (request, "accounts")
+
+    def api_v3_admin_reviews_clear_cache (self, request):
+        """Implements /v3/admin/reviews/clear-cache."""
+        return self.__api_v3_admin_clear_cache (request, "reviews")
 
     def api_v3_datasets_assign_reviewer (self, request, dataset_uuid, reviewer_uuid):
         """Implements /v3/datasets/<id>/assign-reviewer/<rid>."""
@@ -8666,6 +8725,8 @@ class ApiServer:
             return self.error_406 ("application/xml")
 
         parameters = self.__metadata_export_parameters(dataset_id, version)
+        if parameters is None:
+            return self.error_404 (request)
         xml_string = xml_formatter.refworks(parameters)
         output = self.response (xml_string, mimetype="application/xml")
         version_string = f'_v{version}' if version else ''
@@ -8709,6 +8770,8 @@ class ApiServer:
 
         # collect rendering parameters
         parameters = self.__metadata_export_parameters(dataset_id, version=version)
+        if parameters is None:
+            return self.error_404 (request)
         # adjust rendering parameters
         # turn authors in one string
         self.add_names_to_authors(parameters["authors"])
@@ -8729,8 +8792,11 @@ class ApiServer:
 
         # collect rendering parameters
         parameters = self.__metadata_export_parameters(dataset_id, version=version)
+        if parameters is None:
+            return self.error_404 (request)
         # adjust rendering parameters: use / as date separator
-        parameters['published_date'] = parameters['published_date'].replace('-', '/')
+        if parameters["published_date"] is not None:
+            parameters['published_date'] = parameters['published_date'].replace('-', '/')
 
         headers = {"Content-disposition": f"attachment; filename={parameters['item']['uuid']}.ris"}
         return self.__render_export_format(template_name="refman.ris",
@@ -8744,6 +8810,8 @@ class ApiServer:
 
         # collect rendering parameters
         parameters = self.__metadata_export_parameters(dataset_id, version=version)
+        if parameters is None:
+            return self.error_404 (request)
         # adjust rendering parameters
         # prepare Reference Type (Tag %0)
         self.add_names_to_authors(parameters["authors"])
@@ -8763,6 +8831,8 @@ class ApiServer:
 
         # collect rendering parameters
         parameters = self.__metadata_export_parameters(dataset_id, version=version)
+        if parameters is None:
+            return self.error_404 (request)
         self.add_names_to_authors(parameters["authors"])
         headers = {"Content-disposition": f"attachment; filename={parameters['item']['uuid']}_citation.cff"}
         return self.__render_export_format(template_name="citation.cff",

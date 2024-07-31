@@ -30,7 +30,7 @@
     user-select: none;
 }
 </style>
-<script src="/static/js/review-overview.js"></script>
+<script src="/static/js/review-overview.js?cache=1721134140"></script>
 <script>
 activate ();
 </script>
@@ -62,7 +62,7 @@ activate ();
 </ul>
 {% endblock %}
 {% block body %}
-<h1>Overview</h1>
+<h1>Overview{% if may_administer %}<span class="no-select"> &nbsp;<a id="remove-cache" href="#" class="fas fa-sync"></a></span>{% else %}<div id="remove-cache"></div>{% endif %}</h1>
 <p></p>
 {%- if reviews %}
 <table id="overview-table" class="reviewer-table corporate-identity-table">
@@ -104,6 +104,9 @@ activate ();
       <td id="{{review.dataset_uuid}}_status">
       {% if review.status == "assigned": %}
       <span class="fas fa-glasses" title="Assigned to reviewer"><span style="font-size:0pt">assigned</span></span>
+      {%- if 'last_seen_by_reviewer' in review and review.modified_date > review.last_seen_by_reviewer: %}
+      <span class="fas fa-circle-exclamation" title="Modified after seen by reviewer"><span style="font-size:0pt">Modified</span></span>
+      {%- endif %}
       {% elif review.status == "approved": %}
       <span class="fas fa-check-double" title="Approved by reviewer"><span style="font-size:0pt">approved</span></span>
       {% elif review.status == "rejected": %}

@@ -416,6 +416,8 @@ def read_privilege_configuration (server, xml_root, logger):
                 "may_process_feedback": bool(int(config_value (account, "may-process-feedback", None, False))),
                 "may_receive_email_notifications": bool(int(config_value (account, "may-receive-email-notifications", None, True))),
                 "orcid":           orcid,
+                "first_name":      account.attrib.get("first_name"),
+                "last_name":       account.attrib.get("last_name"),
             }
 
             ## The "needs_2fa" property is set to True when the user has any
@@ -1095,12 +1097,7 @@ def main (address=None, port=None, state_graph=None, storage=None,
                     logger.info ("Enabled 2FA for %s.", email_address)
 
             if initialize:
-                lock_file = os.path.abspath (".djehuty-initialized")
-                try:
-                    # We only create a file, so using the 'with' construct
-                    # seems unnecessarily complex.
-                    open (lock_file, "x", encoding="utf-8").close()  # pylint: disable=consider-using-with
-
+                if not server.db.state_graph_is_initialized ():
                     logger.info ("Invalidating caches ...")
                     server.db.cache.invalidate_all ()
                     logger.info ("Initializing RDF store ...")
@@ -1113,15 +1110,12 @@ def main (address=None, port=None, state_graph=None, storage=None,
                         logger.info ("Initialization completed.")
 
                     server.db.initialize_privileged_accounts ()
+                    server.db.mark_state_graph_as_initialized ()
                     initialize = False
-                except FileExistsError:
+                else:
                     logger.warning (("Skipping initialization of the database "
                                      "because it has been initialized before."))
-                    logger.warning ("Remove '%s' and restart to initialize the database.", lock_file)
-
-        server.db.translate_email_to_uuid()
-        logging.info ("Groups werken: %s", server.db.groups)
-
+                    logger.warning ("Empty the state-graph to re-initialize.")
         run_simple (config["address"], config["port"], server,
                     threaded=(config["maximum_workers"] <= 1),
                     processes=config["maximum_workers"],
