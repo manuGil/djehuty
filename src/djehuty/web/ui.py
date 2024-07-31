@@ -1029,10 +1029,6 @@ def main (address=None, port=None, state_graph=None, storage=None,
 
         server.db.setup_sparql_endpoint ()
         server.db.disable_collaboration = server.disable_collaboration
-        if not inside_reload:
-            server.db.delete_inferred_groups()
-            read_group_configuration(server, logger, config_files)
-
 
         if apply_transactions is not None:
             return apply_transactions_from_directory (logger, server, config, apply_transactions)
@@ -1116,7 +1112,12 @@ def main (address=None, port=None, state_graph=None, storage=None,
                     logger.warning (("Skipping initialization of the database "
                                      "because it has been initialized before."))
                     logger.warning ("Empty the state-graph to re-initialize.")
-        run_simple (config["address"], config["port"], server,
+
+            if not inside_reload:
+                server.db.delete_inferred_groups()
+                read_group_configuration(server, logger, config_files)
+
+            run_simple (config["address"], config["port"], server,
                     threaded=(config["maximum_workers"] <= 1),
                     processes=config["maximum_workers"],
                     extra_files=list(config_files),
