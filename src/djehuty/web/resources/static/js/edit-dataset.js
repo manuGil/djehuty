@@ -303,23 +303,26 @@ function render_collaborators_for_dataset (dataset_uuid, may_edit_metadata, call
         for (let collaborator of collaborators) {
             let row = `<tr id="row-${encodeURIComponent(collaborator.uuid)}"><td>`;
             let supervisor_badge = "";
+            let supervisor_disabled = "";
             let group_member_badge = "";
             if (collaborator.is_supervisor) {
                 supervisor_badge = '<span class="active-badge">Supervisor</span>';
+                supervisor_disabled = ' disabled="disabled"'
+                supervisor_no_update = ''
             }
             if (collaborator.is_inferred) {
                 group_member_badge = `<span class="active-badge">${collaborator.group_name}</span>`;
             }
             row += `${collaborator.first_name} ${collaborator.last_name} (${collaborator.email})${supervisor_badge}${group_member_badge}</td>`;
-            row += `<td class="type-begin"><input class="subitem-checkbox-metadata" name="read" type="checkbox"`;
+            row += `<td class="type-begin"><input class="subitem-checkbox-metadata" name="read" type="checkbox"${supervisor_disabled}`;
             row += collaborator.metadata_read ? ' checked="checked"' : '';
-            row += '></td><td class="type-end"><input class="subitem-checkbox-metadata" name="edit" type="checkbox"';
+            row += `></td><td class="type-end"><input class="subitem-checkbox-metadata" name="edit" type="checkbox"${supervisor_disabled}`;
             row += collaborator.metadata_edit ? ' checked="checked"' : '';
-            row += '></td><td><input class="subitem-checkbox-data" name="read" type="checkbox"';
+            row += `></td><td><input class="subitem-checkbox-data" name="read" type="checkbox"${supervisor_disabled}`;
             row += collaborator.data_read ? ' checked="checked"' : '';
-            row += '></td><td><input class="subitem-checkbox-data" name="edit" type="checkbox"';
+            row += `></td><td><input class="subitem-checkbox-data" name="edit" type="checkbox"${supervisor_disabled}`;
             row += collaborator.data_edit ? ' checked="checked"' : '';
-            row += '></td><td class="type-end"><input class="subitem-checkbox-data" name="remove" type="checkbox"';
+            row += `></td><td class="type-end"><input class="subitem-checkbox-data" name="remove" type="checkbox"${supervisor_disabled}`;
             row += collaborator.data_remove ? ' checked="checked"' : '';
             row += '></td><td>';
             if (may_edit_metadata && !collaborator.is_inferred && !collaborator.is_supervisor) {
@@ -329,10 +332,12 @@ function render_collaborators_for_dataset (dataset_uuid, may_edit_metadata, call
                 row += `title="Remove"></a>`;
             }
             row += '</td><td>';
-            row += '<a href="#"';
-            row += `onclick="javascript:update_collaborator('${encodeURIComponent(collaborator.uuid)}', `;
-            row += `'${dataset_uuid}', '${may_edit_metadata}'); return false;" class="fas fa-sync" `;
-            row += `title="Update"></a>`;
+            if (!collaborator.is_supervisor) {
+                row += '<a href="#"';
+                row += `onclick="javascript:update_collaborator('${encodeURIComponent(collaborator.uuid)}', `;
+                row += `'${dataset_uuid}', '${may_edit_metadata}'); return false;" class="fas fa-sync" `;
+                row += `title="Update"></a>`;
+            }
             row += '</td></tr>';
             if (collaborator.is_supervisor) {
                 jQuery("#collaborators-form tbody").prepend(row);

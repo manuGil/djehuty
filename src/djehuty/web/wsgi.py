@@ -1990,7 +1990,7 @@ class ApiServer:
                 return self.error_403 (request)
 
             permissions, error_response = self.__needs_collaborative_permissions (
-                account_uuid, request, "dataset", dataset, "metadata_read")
+                account_uuid, request, "dataset", dataset, ["metadata_read"])
             if error_response is not None:
                 return error_response
 
