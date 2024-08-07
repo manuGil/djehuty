@@ -9,7 +9,7 @@ import os.path
 import logging
 from datetime import datetime
 from urllib.error import URLError, HTTPError
-from rdflib import Dataset, Graph, Literal, RDF, RDFS, XSD, URIRef
+from rdflib import Dataset, Graph, Literal, RDF, XSD, URIRef
 from rdflib.plugins.stores import sparqlstore, memory
 from rdflib.store import CORRUPTED_STORE, NO_STORE
 from jinja2 import Environment, FileSystemLoader

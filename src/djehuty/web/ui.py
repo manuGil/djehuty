@@ -393,6 +393,7 @@ def read_group_configuration (server, logger, config_files):
                         last_name   = last_name,
                         common_name = common_name)
                     server.db.insert_group_member (group_uuid, account_uuid, is_supervisor)
+        return None
 
 def read_privilege_configuration (server, xml_root, logger):
     """Read the privileges configuration from XML_ROOT."""
