@@ -32,17 +32,17 @@ WHERE {
       ?group_uri         djht:members/rdf:rest*/rdf:first/djht:account ?owner .
       ?group_uri         djht:members             ?members .
       ?members           rdf:rest*                ?rest .
-      ?rest              rdf:first                ?member_uri .
+      ?rest              rdf:first                ?collaborator_uri .
       ?rest              djht:index               ?order_index .
-      ?member_uri        rdf:type                 djht:Member .
-      ?member_uri        djht:account             ?account .
-      ?member_uri        djht:metadata_read       ?metadata_read .
-      ?member_uri        djht:metadata_edit       ?metadata_edit .
-      ?member_uri        djht:metadata_remove     ?metadata_remove .
-      ?member_uri        djht:data_read           ?data_read .
-      ?member_uri        djht:data_edit           ?data_edit .
-      ?member_uri        djht:data_remove         ?data_remove .
-      ?member_uri        djht:is_supervisor       ?is_supervisor .
+      ?collaborator_uri  rdf:type                 djht:Member .
+      ?collaborator_uri  djht:account             ?account .
+      ?collaborator_uri  djht:metadata_read       ?metadata_read .
+      ?collaborator_uri  djht:metadata_edit       ?metadata_edit .
+      ?collaborator_uri  djht:metadata_remove     ?metadata_remove .
+      ?collaborator_uri  djht:data_read           ?data_read .
+      ?collaborator_uri  djht:data_edit           ?data_edit .
+      ?collaborator_uri  djht:data_remove         ?data_remove .
+      ?collaborator_uri  djht:is_supervisor       ?is_supervisor .
 
       BIND("true"^^xsd:boolean AS ?is_inferred)
     }
@@ -60,7 +60,7 @@ WHERE {
     OPTIONAL { ?account           djht:last_name           ?last_name . }
     OPTIONAL { ?account           djht:email               ?email . }
 
-    BIND(STRAFTER(STR(?collaborator_uri), "collaborator:") AS ?uuid)
+    BIND(STRAFTER(STR(?collaborator_uri), ":") AS ?uuid)
     BIND(STRAFTER(STR(?account), "account:") AS ?account_uuid)
 
   }
