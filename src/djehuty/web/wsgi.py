@@ -2501,8 +2501,10 @@ class ApiServer:
             if error_response is not None:
                 return error_response
 
-            if value_or(value_or(self.db.groups, collaborator_uuid, None), "is_supervisor", False):
-                return self.error_403(request)
+            collaborators = self.db.collaborators (dataset["uuid"])
+            for collaborator in collaborators:
+                if collaborator.account_uuid == account_uuid and not collaborator.is_supervisor:
+                    return self.error_403 (request)
 
         except IndexError:
             pass

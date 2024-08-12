@@ -29,7 +29,6 @@ class SparqlInterface:
         self.endpoint    = "http://127.0.0.1:8890/sparql"
         self.update_endpoint = None
         self.state_graph = "https://data.4tu.nl/portal/self-test"
-        self.groups      = {}
         self.privileges  = {}
         self.thumbnail_storage = None
         self.profile_images_storage = None
@@ -95,20 +94,6 @@ class SparqlInterface:
 
         self.sparql_is_up = True
         return None
-
-    def translate_email_to_uuid (self):
-        groups = {}
-        if not self.groups:
-            return False
-        for email in self.groups.keys():
-            account = self.account_by_email(email)
-            self.log.info("wat zit dr in account? %s", account)
-            if account is None:
-                self.log.error("No account for %s", email)
-                continue
-            groups[account['uuid']] = self.groups[email]
-        self.groups = groups
-        return True
 
     ## ------------------------------------------------------------------------
     ## Private methods
@@ -3050,8 +3035,6 @@ class SparqlInterface:
             domain     = conv.value_or (account, "domain", "")
             quota      = self.account_quota (email, domain, account)
             account    = { **account, **privileges, "quota": quota }
-            if email in self.groups:
-                account["group_id"] = self.groups[email]
 
         except (TypeError, KeyError):
             pass
