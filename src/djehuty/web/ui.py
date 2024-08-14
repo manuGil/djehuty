@@ -392,6 +392,9 @@ def read_group_configuration (server, logger, config_files):
                         first_name  = first_name,
                         last_name   = last_name,
                         common_name = common_name)
+                    if account_uuid is None:
+                        logger.error("Cannot find account for %s.", email)
+                        continue
                     server.db.insert_group_member (group_uuid, account_uuid, is_supervisor)
         return None
 
@@ -755,7 +758,6 @@ def read_configuration_file (server, config_file, address, port, state_graph,
         read_email_configuration (server, xml_root, logger)
         read_saml_configuration (server, xml_root, logger)
         read_automatic_login_configuration (server, xml_root)
-        logger.info("EN NOE?")
         read_privilege_configuration (server, xml_root, logger)
         read_storage_locations (server, xml_root)
         read_quotas_configuration (server, xml_root)

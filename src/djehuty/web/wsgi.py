@@ -2503,7 +2503,7 @@ class ApiServer:
 
             collaborators = self.db.collaborators (dataset["uuid"])
             for collaborator in collaborators:
-                if collaborator.account_uuid == account_uuid and not collaborator.is_supervisor:
+                if (collaborator["account_uuid"]) == account_uuid and not (collaborator["is_supervisor"]):
                     return self.error_403 (request)
 
         except IndexError:
