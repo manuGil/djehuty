@@ -1291,15 +1291,23 @@ class ApiServer:
             record["last_name"]  = attributes[self.saml_attribute_last_name][0]
             record["common_name"] = attributes[self.saml_attribute_common_name][0]
 
+            self.log.info ("Checking domain")
             if self.saml_attribute_groups is not None:
+                self.log.info ("saml_attribute_groups is not None")
                 groups = attributes[self.saml_attribute_groups]
+                self.log.info ("groups = %s", groups)
                 for group in groups:
+                    self.log.info ("group = %s", group)
                     prefix = f"{self.saml_attribute_group_prefix}:"
                     if group.startswith(prefix):
                         domain = group[len(prefix):].replace("_", ".")
+                        self.log.info ("Checking whether '%s' group exists.", domain)
                         if self.db.group (association=domain):
+                            self.log.info ("Assocation found")
                             record["domain"] = domain
                             break
+                        else:
+                            self.log.info ("self.db.group (association = \"%s\") => F", domain)
 
         except (KeyError, IndexError):
             self.log.error ("Didn't receive expected fields in SAMLResponse.")
