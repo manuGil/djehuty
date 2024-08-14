@@ -1553,7 +1553,7 @@ class SparqlInterface:
 
         graph.add ((account_uri, RDF.type,      rdf.DJHT["Account"]))
 
-        if domain is not None and email is not None:
+        if domain is None and email is not None:
             domain = email.partition("@")[2]
 
         rdf.add (graph, account_uri, rdf.DJHT["active"],     1)
