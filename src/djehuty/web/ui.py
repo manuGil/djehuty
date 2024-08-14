@@ -185,6 +185,8 @@ def read_saml_configuration (server, xml_root, logger):
         server.saml_attribute_last_name = config_value (attributes, "last-name")
         server.saml_attribute_common_name = config_value (attributes, "common-name")
         server.saml_attribute_email = config_value (attributes, "email")
+        server.saml_attribute_groups = config_value (attributes, "groups")
+        server.saml_attribute_group_prefix = config_value (attributes, "group-prefix")
 
     ## Service Provider settings
     service_provider     = saml.find ("service-provider")

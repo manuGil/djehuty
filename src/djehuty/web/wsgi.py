@@ -103,6 +103,8 @@ class ApiServer:
         self.saml_attribute_first_name = "urn:mace:dir:attribute-def:givenName"
         self.saml_attribute_last_name = "urn:mace:dir:attribute-def:sn"
         self.saml_attribute_common_name = "urn:mace:dir:attribute-def:cn"
+        self.saml_attribute_groups = None
+        self.saml_attribute_group_prefix = None
 
         self.datacite_url        = None
         self.datacite_id         = None
@@ -1288,14 +1290,17 @@ class ApiServer:
             record["first_name"] = attributes[self.saml_attribute_first_name][0]
             record["last_name"]  = attributes[self.saml_attribute_last_name][0]
             record["common_name"] = attributes[self.saml_attribute_common_name][0]
-            groups = attributes["urn:oid:1.3.6.1.4.1.5923.1.1.1.7"]
-            domains = []
-            for group in groups:
-                if group.startswith("urn:mace:surf.nl:sram:group:nikhef:djehuty:"):
-                    domain = group[len("urn:mace:surf.nl:sram:group:nikhef:djehuty:"):].replace("_", ".")
 
-            if domains:
-                record["domain"] = domains[0]
+            if self.saml_attribute_groups is not None:
+                groups = attributes[self.saml_attribute_groups]
+                for group in groups:
+                    prefix = f"{self.saml_attribute_group_prefix}:"
+                    if group.startswith(prefix):
+                        domain = group[len(prefix):].replace("_", ".")
+                        if self.db.group (association=domain):
+                            record["domain"] = domain
+                            break
+
         except (KeyError, IndexError):
             self.log.error ("Didn't receive expected fields in SAMLResponse.")
             self.log.error ("Received attributes: %s", attributes)
@@ -1665,9 +1670,9 @@ class ApiServer:
                         self.log.access ("Account %s logged in via SAML.", account_uuid) #  pylint: disable=no-member
                     else:
                         account_uuid = self.db.insert_account (
-                            email      = saml_record["email"],
-                            first_name = value_or_none (saml_record, "first_name"),
-                            last_name  = value_or_none (saml_record, "last_name"),
+                            email       = saml_record["email"],
+                            first_name  = value_or_none (saml_record, "first_name"),
+                            last_name   = value_or_none (saml_record, "last_name"),
                             common_name = value_or_none (saml_record, "common_name"),
                             domain      = value_or_none (saml_record, "domain")
                         )
@@ -2512,7 +2517,7 @@ class ApiServer:
 
             collaborators = self.db.collaborators (dataset["uuid"])
             for collaborator in collaborators:
-                if (collaborator["account_uuid"]) == account_uuid and not (collaborator["is_supervisor"]):
+                if collaborator["account_uuid"] == account_uuid and not collaborator["is_supervisor"]:
                     return self.error_403 (request)
 
         except IndexError:

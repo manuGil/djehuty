@@ -1545,7 +1545,7 @@ class SparqlInterface:
         return None
 
     def insert_account (self, email=None, first_name=None, last_name=None,
-                        common_name=None, location=None, biography=None):
+                        common_name=None, location=None, biography=None, domain=None):
         """Procedure to create an account."""
 
         graph       = Graph()
@@ -1553,8 +1553,7 @@ class SparqlInterface:
 
         graph.add ((account_uri, RDF.type,      rdf.DJHT["Account"]))
 
-        domain = None
-        if email is not None:
+        if domain is not None and email is not None:
             domain = email.partition("@")[2]
 
         rdf.add (graph, account_uri, rdf.DJHT["active"],     1)
