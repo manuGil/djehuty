@@ -332,7 +332,7 @@ function render_collaborators_for_dataset (dataset_uuid, may_edit_metadata, call
                 row += `title="Remove"></a>`;
             }
             row += '</td><td>';
-            if (!collaborator.is_supervisor) {
+            if (may_edit_metadata && !collaborator.is_supervisor && !collaborator.is_inferred) {
                 row += '<a href="#"';
                 row += `onclick="javascript:update_collaborator('${encodeURIComponent(collaborator.uuid)}', `;
                 row += `'${dataset_uuid}', '${may_edit_metadata}'); return false;" class="fas fa-sync" `;
