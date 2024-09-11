@@ -72,7 +72,7 @@ INSERT {
     {%- endif%}{% if institution_id is not none %}
     ?account          djht:institution_id      {{institution_id}} .
     {%- endif%}{% if domain is not none %}
-    ?account          djht:domain              {{domain}} .
+    ?account          djht:domain              {{domain | safe}} .
     {%- endif%}{% if profile_image is not none %}
     ?account          djht:profile_image       <{{profile_image | safe}}> .
     {%- endif%}{% if maximum_file_size is not none %}
