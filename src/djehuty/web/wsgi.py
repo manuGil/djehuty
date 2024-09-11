@@ -1306,7 +1306,7 @@ class ApiServer:
                         if group:
                             self.log.info ("Assocation found")
                             record["domain"] = domain
-                            record["group_uuid"] = group["uuid"]
+                            record["group_uuid"] = group[0]["uuid"]
                             break
                         else:
                             self.log.info ("self.db.group (association = \"%s\") => F", domain)
