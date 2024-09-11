@@ -1675,6 +1675,12 @@ class ApiServer:
                     account = self.db.account_by_email (saml_record["email"])
                     if account:
                         account_uuid = account["uuid"]
+                        if not self.db.update_account (account_uuid, domain=saml_record["domain"]):
+                            self.log.error ("Unable to update the association for account %s",
+                                            account_uuid)
+                        else:
+                            self.log.info ("Updated domain to '%s' for account <account:%s>.",
+                                           saml_record["domain"], account_uuid)
                         self.log.access ("Account %s logged in via SAML.", account_uuid) #  pylint: disable=no-member
                     else:
                         account_uuid = self.db.insert_account (
