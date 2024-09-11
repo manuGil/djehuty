@@ -154,9 +154,17 @@ WHERE {
     ?container_uri      djht:account              ?account .
     {%- if not disable_collaboration %}
     OPTIONAL {
-      ?collaborator       rdf:type            djht:Collaborator .
-      ?collaborator       djht:item           ?dataset .
-      ?collaborator       djht:account        ?collaborator_account .
+      {
+        ?collaborator       rdf:type            djht:Collaborator .
+        ?collaborator       djht:item           ?dataset .
+        ?collaborator       djht:account        ?collaborator_account .
+      } UNION {
+        ?group_uri         rdf:type djht:InstitutionGroup .
+        ?group_uri         djht:members/rdf:rest*/rdf:first/djht:account ?account .
+        ?group_uri         djht:members/rdf:rest*/rdf:first ?collaborator_uri .
+        ?collaborator_uri  djht:is_supervisor "true"^^xsd:boolean .
+        ?collaborator_uri  djht:account ?collaborator_account .
+
     }
     {%- endif %}
 
