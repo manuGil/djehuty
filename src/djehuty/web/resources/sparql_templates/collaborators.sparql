@@ -24,6 +24,14 @@ WHERE {
       ?collaborator_uri  djht:data_read           ?data_read .
       ?collaborator_uri  djht:data_edit           ?data_edit .
       ?collaborator_uri  djht:data_remove         ?data_remove .
+
+      OPTIONAL {
+        ?account           djht:domain              ?domain .
+        ?group_uri         rdf:type                   djht:InstitutionGroup ;
+                           djht:association_criteria  ?domain ;
+                           djht:name                  ?group_name ;
+                           djht:id                    ?group_id .
+      }
       BIND("false"^^xsd:boolean AS ?is_inferred)
     }
     {%- if include_inferred %}
@@ -31,6 +39,8 @@ WHERE {
       ?group_uri         rdf:type djht:InstitutionGroup .
       ?group_uri         djht:members/rdf:rest*/rdf:first/djht:account ?owner .
       ?group_uri         djht:members             ?members .
+      ?group_uri         djht:name                ?group_name .
+      ?group_uri         djht:id                  ?group_id .
       ?members           rdf:rest*                ?rest .
       ?rest              rdf:first                ?collaborator_uri .
       ?rest              djht:index               ?order_index .
@@ -47,15 +57,6 @@ WHERE {
       BIND("true"^^xsd:boolean AS ?is_inferred)
     }
     {%- endif %}
-    OPTIONAL {
-      ?account           djht:domain                ?domain .
-      }
-    OPTIONAL {
-      ?group_uri         rdf:type                   djht:InstitutionGroup ;
-                         djht:association_criteria  ?domain ;
-                         djht:name                  ?group_name ;
-                         djht:id                    ?group_id .
-    }
     OPTIONAL { ?account           djht:first_name          ?first_name . }
     OPTIONAL { ?account           djht:last_name           ?last_name . }
     OPTIONAL { ?account           djht:email               ?email . }
