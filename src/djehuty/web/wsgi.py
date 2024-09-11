@@ -1302,7 +1302,7 @@ class ApiServer:
                     if group.startswith(prefix):
                         domain = group[len(prefix):].replace("_", ".")
                         self.log.info ("Checking whether '%s' group exists.", domain)
-                        group = self.db.group (association=domain):
+                        group = self.db.group (association=domain)
                         if group:
                             self.log.info ("Assocation found")
                             record["domain"] = domain
