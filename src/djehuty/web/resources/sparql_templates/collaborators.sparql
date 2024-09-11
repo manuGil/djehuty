@@ -44,6 +44,7 @@ WHERE {
       ?collaborator_uri  djht:data_remove         ?data_remove .
       ?collaborator_uri  djht:is_supervisor       ?is_supervisor .
 
+      FILTER (?collaborator_uri != ?owner)
       BIND("true"^^xsd:boolean AS ?is_inferred)
     }
     {%- endif %}
