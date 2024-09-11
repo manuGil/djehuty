@@ -1680,12 +1680,12 @@ class ApiServer:
                         if not self.db.update_account (account_uuid, domain=saml_record["domain"]):
                             self.log.error ("Unable to update the association for account %s",
                                             account_uuid)
+                        else:
                             # TODO: Fix the supervisor assignment.
                             if self.db.insert_group_member (saml_record["group_uuid"], account_uuid, False):
                                 self.log.info ("Added <account:%s> to group <group:%s>.", account_uuid, saml_record["group_uuid"])
                             else:
                                 self.log.info ("Failed to add <account:%s> to group <group:%s>.", account_uuid, saml_record["group_uuid"])
-                        else:
                             self.log.info ("Updated domain to '%s' for account <account:%s>.",
                                            saml_record["domain"], account_uuid)
                         self.log.access ("Account %s logged in via SAML.", account_uuid) #  pylint: disable=no-member
