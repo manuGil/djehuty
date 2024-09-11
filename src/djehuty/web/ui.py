@@ -645,6 +645,8 @@ def read_configuration_file (server, config_file, address, port, state_graph,
         enable_query_audit_log = xml_root.find ("enable-query-audit-log")
         if enable_query_audit_log is not None:
             config["transactions_directory"] = enable_query_audit_log.attrib.get("transactions-directory")
+            if config["transactions_directory"] is None:
+                config["transactions_directory"] = "."
             try:
                 server.db.enable_query_audit_log = bool(int(enable_query_audit_log.text))
             except (ValueError, TypeError):
