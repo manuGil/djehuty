@@ -164,7 +164,7 @@ WHERE {
         ?group_uri         djht:members/rdf:rest*/rdf:first ?collaborator_uri .
         ?collaborator_uri  djht:is_supervisor "true"^^xsd:boolean .
         ?collaborator_uri  djht:account ?collaborator_account .
-
+      }
     }
     {%- endif %}
 
