@@ -9,6 +9,7 @@ SELECT DISTINCT ?dataset_uri
                 (?rest AS ?originating_blank_node)      ?is_inferred
 WHERE {
   GRAPH <{{state_graph}}> {
+    ?dataset_uri       djht:container/djht:account ?owner .
     {
       ?dataset_uri       djht:collaborators       ?collaborators .
       ?collaborators     rdf:rest*                ?rest .
@@ -27,7 +28,6 @@ WHERE {
     }
     {%- if include_inferred %}
     UNION {
-      ?dataset_uri       djht:container/djht:account ?owner .
       ?group_uri         rdf:type djht:InstitutionGroup .
       ?group_uri         djht:members/rdf:rest*/rdf:first/djht:account ?owner .
       ?group_uri         djht:members             ?members .
@@ -44,7 +44,6 @@ WHERE {
       ?collaborator_uri  djht:data_remove         ?data_remove .
       ?collaborator_uri  djht:is_supervisor       ?is_supervisor .
 
-      FILTER (?collaborator_uri != ?owner)
       BIND("true"^^xsd:boolean AS ?is_inferred)
     }
     {%- endif %}
@@ -65,6 +64,7 @@ WHERE {
     BIND(STRAFTER(STR(?account), "account:") AS ?account_uuid)
 
   }
+FILTER (?owner != ?account)
 FILTER (?dataset_uri = <dataset:{{dataset_uuid}}>)
 {%- if account_uuid is not none %}
 FILTER (?account = <account:{{account_uuid}}>)
