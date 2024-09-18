@@ -1674,7 +1674,7 @@ class ApiServer:
                     if "email" not in saml_record:
                         return self.error_400 (request, "Invalid request", "MissingEmailProperty")
 
-                    account = self.db.account_by_email (saml_record["email"])
+                    account = self.db.account_by_email (saml_record["email"].lower())
                     if account:
                         account_uuid = account["uuid"]
                         if not self.db.update_account (account_uuid, domain=saml_record["domain"]):
