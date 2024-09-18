@@ -1829,6 +1829,7 @@ class SparqlInterface:
         graph = Graph()
         member_uri = rdf.unique_node("member")
         account_uri = URIRef(rdf.uuid_to_uri(account_uuid, "account"))
+        group_uri = URIRef(rdf.uuid_to_uri(group_uuid, "group"))
         graph.add((member_uri, RDF.type, rdf.DJHT["Member"]))
         rdf.add(graph, member_uri, rdf.DJHT["metadata_read"], True, XSD.boolean)
         rdf.add(graph, member_uri, rdf.DJHT["metadata_edit"], True, XSD.boolean)
@@ -1838,6 +1839,7 @@ class SparqlInterface:
         rdf.add(graph, member_uri, rdf.DJHT["data_remove"], is_supervisor, XSD.boolean)
         rdf.add(graph, member_uri, rdf.DJHT["is_supervisor"], is_supervisor, XSD.boolean)
         rdf.add(graph, member_uri, rdf.DJHT["account"], account_uri, "uri")
+        rdf.add(graph, account_uri, rdf.DJHT["group"], group_uri, "uri")
 
         existing_members = self.members(group_uuid)
         if not existing_members:
