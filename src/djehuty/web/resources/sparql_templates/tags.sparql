@@ -18,6 +18,13 @@ WHERE {
       ?collaborator djht:account              ?collaborator_account .
       ?collaborator djht:metadata_read        "true"^^xsd:boolean .
     }
+    OPTIONAL {
+      ?group_uri          rdf:type djht:InstitutionGroup .
+      ?account            djht:group    ?group_uri .
+      ?group_uri          djht:members/rdf:rest*/rdf:first ?member_uri .
+      ?member_uri         djht:is_supervisor "true"^^xsd:boolean .
+      ?member_uri         djht:account ?member_account .
+    }
     {%- endif %}
     {%- endif %}
   }
@@ -26,7 +33,8 @@ WHERE {
   FILTER (?account = <account:{{account_uuid}}>)
   {%- else %}
   FILTER (?account = <account:{{account_uuid}}> ||
-          ?collaborator_account = <account:{{account_uuid}}>)
+          ?collaborator_account = <account:{{account_uuid}}> ||
+          ?member_account = <account:{{account_uuid}}>)
   {%- endif %}
 {%- endif %}
 {%- if item_uri is not none %}
