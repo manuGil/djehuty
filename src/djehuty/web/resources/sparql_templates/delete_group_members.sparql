@@ -1,0 +1,22 @@
+{% extends "prefixes.sparql" %}
+{% block query %}
+DELETE {
+  GRAPH <{{state_graph}}> {
+    ?group       djht:members         ?members .
+    ?rest        rdf:first            ?first .
+    ?rest        djht:index           ?index .
+    ?members     rdf:rest*            ?rest .
+  }
+}
+WHERE {
+  GRAPH <{{state_graph}}> {
+    ?group       rdf:type             djht:InstitutionGroup .
+    ?group       djht:is_inferred     "true"^^xsd:string .
+    ?group       djht:members         ?members .
+    ?members     rdf:rest*            ?rest .
+    ?rest        rdf:first            ?first .
+    ?rest        djht:index           ?index .
+  }
+  FILTER (?account = <account:{{account_uuid}}>)
+}
+{% endblock %}

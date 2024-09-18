@@ -37,7 +37,7 @@ WHERE {
     {%- if include_inferred %}
     UNION {
       ?group_uri         rdf:type djht:InstitutionGroup .
-      ?group_uri         djht:members/rdf:rest*/rdf:first/djht:account ?owner .
+      ?owner             djht:group               ?group_uri .
       ?group_uri         djht:members             ?members .
       ?group_uri         djht:name                ?group_name .
       ?group_uri         djht:id                  ?group_id .

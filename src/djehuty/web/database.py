@@ -1874,8 +1874,12 @@ class SparqlInterface:
         return None
 
     def delete_inferred_groups (self):
-        query = self.__query_from_template("delete_inferred_groups")
-        return self.__run_logged_query (query)
+       query = self.__query_from_template ("delete_group_members")
+       self.__run_logged_query (query)
+       query = self.__query_from_template ("delete_inferred_groups")
+       self.__run_logged_query (query)
+       query = self.__query_from_template ("delete_account_groups_associations")
+       self.__run_logged_query (query)
 
     def item_collaborative_permissions (self, item_type, item_uuid,
                                         collaborator_account_uuid):

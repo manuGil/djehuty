@@ -10,7 +10,6 @@ WHERE {
     ?group      rdf:type            djht:InstitutionGroup .
     ?group      djht:is_inferred    "true"^^xsd:boolean .
     ?group      ?predicate          ?object .
-    ?account    rdf:type            djht:Account .
   }
 }
 {% endblock %}
