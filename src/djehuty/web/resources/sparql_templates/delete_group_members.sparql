@@ -17,6 +17,5 @@ WHERE {
     ?rest        rdf:first            ?first .
     ?rest        djht:index           ?index .
   }
-  FILTER (?account = <account:{{account_uuid}}>)
 }
 {% endblock %}
