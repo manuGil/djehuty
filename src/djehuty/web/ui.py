@@ -364,7 +364,7 @@ def read_group_configuration (server, logger, config_files):
             continue
         groups = xml_root.find("groups")
         if not groups:
-            return None
+            continue
 
         for group in groups:
             group_name = group.attrib["name"]
@@ -400,7 +400,7 @@ def read_group_configuration (server, logger, config_files):
                         logger.error("Cannot find account for %s.", email)
                         continue
                     server.db.insert_group_member (group_uuid, account_uuid, is_supervisor)
-        return None
+    return None
 
 def read_privilege_configuration (server, xml_root, logger):
     """Read the privileges configuration from XML_ROOT."""
