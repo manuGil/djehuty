@@ -3,9 +3,9 @@
 DELETE {
   GRAPH <{{state_graph}}> {
     ?group       djht:members         ?members .
+    ?members     rdf:rest             ?rest .
     ?rest        rdf:first            ?first .
     ?rest        djht:index           ?index .
-    ?members     rdf:rest*            ?rest .
   }
 }
 WHERE {
