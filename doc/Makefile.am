@@ -45,21 +45,26 @@ EXTRA_DIST              = $(doc_TEX) $(doc_STYLE)                  \
 
 
 if HAVE_HTLATEX
+index.html: $(doc_HTML)
+
 $(doc_HTML): $(doc_PDF)
 	@cp -r ${abs_top_srcdir}/src/djehuty/web/resources/static/fonts ${srcdir}
 	@$(HTLATEX) $(doc_TEX) > /dev/null
-	@printf "Generated $(doc_HTML).\n"
+	@mv $(doc_NAME).html index.html
+	@printf "Generated index.html.\n"
 
 .PHONY: $(doc_NAME).css
 .PHONY: $(doc_NAME)2.html $(doc_NAME)3.html $(doc_NAME)4.html $(doc_NAME)5.html
 .PHONY: fonts/SourceSansPro-Regular.ttf fonts/SourceSansPro-Italic.ttf
 .PHONY: fonts/SourceSansPro-Bold.ttf fonts/FiraMono-Regular.ttf
 
-nobase_dist_doc_DATA     = $(doc_HTML)                             \
+nobase_dist_doc_DATA     = index.html                              \
                            $(doc_NAME)2.html                       \
                            $(doc_NAME)3.html                       \
                            $(doc_NAME)4.html                       \
                            $(doc_NAME)5.html                       \
+                           $(doc_NAME)6.html                       \
+                           $(doc_NAME)7.html                       \
                            $(doc_NAME).css                         \
                            figures/references-graph-.png           \
                            figures/typed-notation-.png             \
@@ -97,6 +102,8 @@ docs-clean:
       $(doc_NAME)2.html                                            \
       $(doc_NAME)3.html                                            \
       $(doc_NAME)4.html                                            \
+      $(doc_NAME)5.html                                            \
+      index.html                                                   \
       missfont.log                                                 \
       texput.log                                                   \
       figures/account-.png                                         \

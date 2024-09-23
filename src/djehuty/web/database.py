@@ -1546,17 +1546,21 @@ class SparqlInterface:
         return None
 
     def insert_account (self, email=None, first_name=None, last_name=None,
-                        common_name=None, location=None, biography=None, domain=None):
+                        common_name=None, location=None, biography=None,
+                        domain=None, orcid_id=None):
         """Procedure to create an account."""
 
-        graph       = Graph()
-        account_uri = rdf.unique_node ("account")
+        graph        = Graph()
+        account_uri  = rdf.unique_node ("account")
 
-        graph.add ((account_uri, RDF.type,      rdf.DJHT["Account"]))
-
+        domain       = None
         if domain is None and email is not None:
             domain = email.partition("@")[2]
 
+        if common_name is None and first_name is not None and last_name is not None:
+            common_name = f"{first_name} {last_name}"
+
+        rdf.add (graph, account_uri, RDF.type,               rdf.DJHT["Account"], "uri")
         rdf.add (graph, account_uri, rdf.DJHT["active"],     1)
         rdf.add (graph, account_uri, rdf.DJHT["first_name"], first_name, XSD.string)
         rdf.add (graph, account_uri, rdf.DJHT["last_name"],  last_name,  XSD.string)
@@ -1572,6 +1576,22 @@ class SparqlInterface:
 
         if self.add_triples_from_graph (graph):
             self.cache.invalidate_by_prefix ("accounts")
+
+            if email is not None and (first_name is not None or last_name is not None):
+                account_uuid = rdf.uri_to_uuid (account_uri)
+                author_uuid = self.insert_author (
+                    first_name   = first_name,
+                    last_name    = last_name,
+                    full_name    = common_name,
+                    email        = email,
+                    account_uuid = account_uuid,
+                    orcid_id     = orcid_id,
+                    is_active    = True,
+                    is_public    = True)
+                if not author_uuid:
+                    self.log.warning ("Failed to link author to new account for %s.", email)
+                self.cache.invalidate_by_prefix ("repository_statistics")
+
             return rdf.uri_to_uuid (account_uri)
 
         return None
@@ -1778,7 +1798,7 @@ class SparqlInterface:
     def update_file (self, account_uuid, file_uuid, dataset_uuid, download_url=None,
                      computed_md5=None, viewer_type=None, preview_state=None,
                      file_size=None, status=None, filesystem_location=None,
-                     is_incomplete=None, is_image=None):
+                     is_incomplete=None, is_image=None, handle=None):
         """Procedure to update file metadata."""
 
         modified_date = datetime.strftime (datetime.now(), "%Y-%m-%dT%H:%M:%SZ")
@@ -1794,7 +1814,8 @@ class SparqlInterface:
             "is_incomplete": is_incomplete,
             "is_image":      rdf.escape_boolean_value (is_image),
             "modified_date": modified_date,
-            "status":        status
+            "status":        status,
+            "handle":        handle
         })
 
         self.cache.invalidate_by_prefix (f"{account_uuid}_storage")
@@ -1825,7 +1846,7 @@ class SparqlInterface:
         return False
 
     def insert_group_member (self, group_uuid, account_uuid, is_supervisor):
-
+        """Procedure to link an account to a group."""
         graph = Graph()
         member_uri = rdf.unique_node("member")
         account_uri = URIRef(rdf.uuid_to_uri(account_uuid, "account"))
@@ -1860,6 +1881,7 @@ class SparqlInterface:
         return self.__run_query(query)
 
     def insert_group (self, name, is_inferred, group_id, domain):
+        """Procedure to create a new group."""
         graph = Graph()
         group_uri = rdf.unique_node("group")
         rdf.add(graph, group_uri, rdf.DJHT["association_criteria"], domain, XSD.string)
@@ -1874,12 +1896,13 @@ class SparqlInterface:
         return None
 
     def delete_inferred_groups (self):
-       query = self.__query_from_template ("delete_group_members")
-       self.__run_logged_query (query)
-       query = self.__query_from_template ("delete_inferred_groups")
-       self.__run_logged_query (query)
-       query = self.__query_from_template ("delete_account_groups_associations")
-       self.__run_logged_query (query)
+        """Procedure to remove groups that were loaded from a configuration file."""
+        query = self.__query_from_template ("delete_group_members")
+        self.__run_logged_query (query)
+        query = self.__query_from_template ("delete_inferred_groups")
+        self.__run_logged_query (query)
+        query = self.__query_from_template ("delete_account_groups_associations")
+        self.__run_logged_query (query)
 
     def item_collaborative_permissions (self, item_type, item_uuid,
                                         collaborator_account_uuid):
@@ -3161,9 +3184,11 @@ class SparqlInterface:
                 self.log.info ("Account for %s already exists.", email)
                 continue
 
+            orcid        = self.privileges[email]["orcid"]
             first_name   = self.privileges[email]["first_name"]
             last_name    = self.privileges[email]["last_name"]
             account_uuid = self.insert_account (email      = email,
+                                                orcid_id   = orcid,
                                                 first_name = first_name,
                                                 last_name  = last_name)
             if not account_uuid:
@@ -3171,25 +3196,6 @@ class SparqlInterface:
                 continue
 
             self.log.info ("Created account for %s.", email)
-
-            orcid = self.privileges[email]["orcid"]
-            if orcid is None:
-                continue
-
-            author_uuid = self.insert_author (
-                email        = email,
-                first_name   = first_name,
-                last_name    = last_name,
-                account_uuid = account_uuid,
-                orcid_id     = orcid,
-                is_active    = True,
-                is_public    = True)
-            if not author_uuid:
-                self.log.warning ("Failed to link author to account for %s.", email)
-                continue
-
-            self.log.info ("Linked account of %s to ORCID: %s.", email, orcid)
-            continue
 
     def update_view_and_download_counts (self):
         """Procedure that recalculate views and downloads statistics."""

@@ -1,7 +1,8 @@
-AC_INIT(djehuty, 24.6-dev)
+AC_INIT(djehuty, 24.8-dev)
 AM_INIT_AUTOMAKE([foreign tar-ustar])
-AM_PATH_PYTHON([3.7])
+AM_PATH_PYTHON([3.8])
 AC_CONFIG_FILES([
+  guix.scm
   Makefile
   src/Makefile
   pyproject.toml
@@ -33,6 +34,15 @@ AM_COND_IF([HAVE_PDFLATEX],
            [AC_CONFIG_FILES([
               doc/Makefile
               doc/djehuty.sty])])
+
+dnl Package-specific configurable options
+dnl ---------------------------------------------------------------------------
+
+AC_ARG_VAR(BASE_URL, [The URL on which the instance will run.  This is only
+                      used to align the documentation.])
+
+dnl Default value for BASE_URL
+: "${BASE_URL=https://data.4tu.nl}"
 
 dnl Check for presence of 'git'.
 dnl ---------------------------------------------------------------------------

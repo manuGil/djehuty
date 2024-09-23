@@ -294,7 +294,7 @@ function render_references_for_dataset (dataset_uuid) {
 function render_collaborators_for_dataset (dataset_uuid, may_edit_metadata, callback=jQuery.noop) {
     jQuery.ajax({
         url:         `/v3/datasets/${dataset_uuid}/collaborators`,
-        data:        { "limit": 10000, "order": "asc", "order_direction": "id" },
+        data:        { "limit": 10000, "order": "id", "order_direction": "asc" },
         type:        "GET",
         accept:      "application/json",
     }).done(function (collaborators) {
@@ -593,7 +593,7 @@ function render_authors_for_dataset (dataset_uuid) {
 function render_funding_for_dataset (dataset_uuid) {
     jQuery.ajax({
         url:         `/v2/account/articles/${dataset_uuid}/funding`,
-        data:        { "limit": 10000, "order": "asc", "order_direction": "id" },
+        data:        { "limit": 10000, "order": "id", "order_direction": "asc" },
         type:        "GET",
         accept:      "application/json",
     }).done(function (funders) {
@@ -670,7 +670,7 @@ function render_git_files_for_dataset (dataset_uuid, event) {
     }
     jQuery.ajax({
         url:         `/v3/datasets/${dataset_uuid}.git/files`,
-        data:        { "limit": 10000, "order": "asc", "order_direction": "id" },
+        data:        { "limit": 10000, "order": "id", "order_direction": "asc" },
         type:        "GET",
         accept:      "application/json",
     }).done(function (files) {
@@ -689,7 +689,7 @@ function render_git_files_for_dataset (dataset_uuid, event) {
 function render_files_for_dataset (dataset_uuid, fileUploader) {
     jQuery.ajax({
         url:         `/v2/account/articles/${dataset_uuid}/files`,
-        data:        { "limit": 10000, "order": "asc", "order_direction": "id" },
+        data:        { "limit": 10000, "order": "id", "order_direction": "asc" },
         type:        "GET",
         accept:      "application/json",
     }).done(function (files) {
@@ -713,7 +713,12 @@ function render_files_for_dataset (dataset_uuid, fileUploader) {
                 if ("is_incomplete" in file && file["is_incomplete"] == true) {
                     html_filename += ` <span class="file-incomplete-warning">The file upload was not complete!</span>`;
                 }
-                html += `<td>${html_filename}</td>`;
+                let file_handle = "";
+                if ("handle" in file) {
+                    file_handle  = `<a href="https://hdl.handle.net/${file.handle}">`;
+                    file_handle += '<img src="/static/images/handle-logo.png" class="handle-icon" alt="Handle" /></a>';
+                }
+                html += `<td>${html_filename} ${file_handle}</td>`;
                 if (file["computed_md5"] === null) {
                     html += `<td>${render_in_form("Unavailable")}</td>`;
                 } else {

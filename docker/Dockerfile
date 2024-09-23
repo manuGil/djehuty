@@ -1,6 +1,7 @@
 FROM debian:bookworm-slim
 LABEL authors="Nikhef, 4TU.ResearchData"
 ARG PURPOSE="release"
+ARG BRANCH="main"
 
 # Build a self-updating (development) container:
 # docker image build --build-arg="PURPOSE=development" -t djehuty:devel .
@@ -10,8 +11,7 @@ ARG PURPOSE="release"
 #
 # start with: docker container run --rm -ti -v ../etc/djehuty/djehuty-example-config.xml:/config.xml:Z djehuty:latest /bin/djehuty web -c /config.xml
 
-RUN apt-get update && apt-get install -y python3 python3-venv git
-RUN rm -rf /var/lib/dpkg/info/*.list /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y python3 python3-venv git && rm -rf /var/lib/dpkg/info/*.list /var/lib/apt/lists/*
 RUN useradd -mg users -d /opt/djehuty -u 7001 djehuty
 RUN mkdir -p /data && chown -R djehuty: /data
 
@@ -22,7 +22,7 @@ RUN UPDATE_COMMAND=""; if [ "$PURPOSE" = "development" ]; then UPDATE_COMMAND="/
 
 USER djehuty
 
-RUN git clone --depth 1 https://github.com/4TUResearchData/djehuty.git /opt/djehuty/djehuty
+RUN git clone --branch "$BRANCH" --depth 1 https://github.com/4TUResearchData/djehuty.git /opt/djehuty/djehuty
 RUN VERSION=$(git -C /opt/djehuty/djehuty rev-parse --short HEAD); sed -e "s/@VERSION@/0.0.0+${VERSION}/g" /opt/djehuty/djehuty/pyproject.toml.in > /opt/djehuty/djehuty/pyproject.toml
 
 RUN python3 -m venv /opt/djehuty/virtual-env

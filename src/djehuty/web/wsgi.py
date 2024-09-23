@@ -5,6 +5,8 @@ from urllib.parse import quote, unquote
 from io import StringIO
 import os.path
 import os
+import shutil
+import tempfile
 import getpass
 import logging
 import json
@@ -83,6 +85,15 @@ class ApiServer:
         self.disable_2fa      = False
         self.disable_collaboration = False
         self.automatic_login_email = None
+
+        self.handle_certificate_path = None
+        self.handle_certificate      = None
+        self.handle_private_key_path = None
+        self.handle_private_key      = None
+        self.handle_url              = None
+        self.handle_prefix           = None
+        self.handle_index            = None
+
         self.small_footer     = (
             '<div id="footer-wrapper2"><p>This repository is powered by '
             '<a href="https://github.com/4TUResearchData/djehuty">djehuty</a> '
@@ -388,6 +399,7 @@ class ApiServer:
             R("/v3/datasets/<git_uuid>.git/git-receive-pack",                    self.api_v3_private_dataset_git_receive_pack),
             R("/v3/datasets/<git_uuid>.git/languages",                           self.api_v3_dataset_git_languages),
             R("/v3/datasets/<git_uuid>.git/contributors",                        self.api_v3_dataset_git_contributors),
+            R("/v3/datasets/<git_uuid>.git/zip",                                 self.api_v3_dataset_git_zip),
 
             ## ----------------------------------------------------------------
             ## SHARED SUBMIT INTERFACE API
@@ -927,9 +939,14 @@ class ApiServer:
             file = None
             if parses_to_int (identifier):
                 file = self.db.dataset_files (file_id = int(identifier), **parameters)
-            elif (validator.is_valid_uuid (identifier) or
+            elif (validator.is_valid_uuid (identifier) and
                   validator.is_valid_uuid (uri_to_uuid (dataset_uri))):
                 file = self.db.dataset_files (file_uuid = identifier, **parameters)
+            elif validator.is_valid_uuid (identifier):
+                parameters["dataset_uri"] = None
+                file = self.db.dataset_files (file_uuid = identifier, **parameters)
+            elif (validator.is_valid_uuid (uri_to_uuid (dataset_uri))):
+                file = self.db.dataset_files (file_uuid = None, **parameters)
 
             return file
 
@@ -971,7 +988,7 @@ class ApiServer:
         try:
             return self.__files_by_id_or_uri (identifier, account_uuid,
                                               dataset_uri, private_view)[0]
-        except IndexError:
+        except (TypeError, IndexError):
             return None
 
     def __paging_offset_and_limit (self, request, error_list=None):
@@ -1308,8 +1325,7 @@ class ApiServer:
                             record["domain"] = domain
                             record["group_uuid"] = group[0]["uuid"]
                             break
-                        else:
-                            self.log.info ("self.db.group (association = \"%s\") => F", domain)
+                        self.log.info ("self.db.group (association = \"%s\") => F", domain)
 
         except (KeyError, IndexError):
             self.log.error ("Didn't receive expected fields in SAMLResponse.")
@@ -1622,27 +1638,18 @@ class ApiServer:
             account_uuid = self.db.account_uuid_by_orcid (orcid_record['orcid'])
             if account_uuid is None:
                 try:
-                    email = f"{orcid_record['orcid']}@orcid"
                     account_uuid = self.db.insert_account (
                         # We don't receive the user's e-mail address,
                         # so we construct an artificial one that doesn't
                         # resolve so no accidental e-mails will be sent.
-                        email      = email,
-                        common_name = orcid_record["name"]
+                        email       = f"{orcid_record['orcid']}@orcid",
+                        common_name = orcid_record["name"],
+                        orcid_id    = orcid_record['orcid']
                     )
                     if not account_uuid:
                         return self.error_500 ()
 
                     self.log.access ("Account %s created via ORCID.", account_uuid) #  pylint: disable=no-member
-                    author_uuid = self.db.insert_author (
-                        email        = email,
-                        account_uuid = account_uuid,
-                        orcid_id     = orcid_record['orcid'],
-                        is_active    = True,
-                        is_public    = True)
-                    if not author_uuid:
-                        self.log.error ("Failed to link author to new account for %s.", email)
-                        return self.error_500 ()
                 except KeyError:
                     self.log.error ("Received an unexpected record from ORCID.")
                     return self.error_403 (request)
@@ -1702,6 +1709,9 @@ class ApiServer:
                             return self.error_500()
                         self.log.access ("Account %s created via SAML.", account_uuid) #  pylint: disable=no-member
 
+                    # For a while we didn't create author records for accounts.
+                    # This check creates the missing author records upon login
+                    # for such accounts.
                     authors = self.db.authors (account_uuid=account_uuid, limit = 1)
                     if not value_or (authors, 0, True):
                         author_uuid = self.db.insert_author (
@@ -1801,7 +1811,7 @@ class ApiServer:
             assigned_uuid = uri_to_uuid (review["assigned_to"])
             if account_uuid == assigned_uuid:
                 self.db.dataset_update_seen_by_reviewer (dataset["uuid"])
-        except (TypeError, IndexError):
+        except (KeyError, TypeError, IndexError):
             pass
 
         # Add a secondary cookie to go back to at one point.
@@ -3199,7 +3209,7 @@ class ApiServer:
         summary_data = self.db.repository_statistics()
         try:
             for key in summary_data:
-                summary_data[key] = "{:,}".format(int(summary_data[key]))  # pylint: disable=consider-using-f-string
+                summary_data[key] = f"{int(summary_data[key]):,}"
         except ValueError:
             summary_data = { "datasets": 0, "authors": 0, "collections": 0, "files": 0, "bytes": 0 }
 
@@ -3935,13 +3945,14 @@ class ApiServer:
                                 "No files associated with this dataset")
                 return self.error_404 (request)
 
+            writer = None
             try:
                 zipfly_object = zipfly.ZipFly(paths = file_paths)
+                writer = zipfly_object.generator()
             except TypeError:
                 self.log.error ("Error in zipping files: %s", file_paths)
                 return self.error_404 (request)
 
-            writer = zipfly_object.generator()
             response = self.response (writer, mimetype="application/zip")
 
             if version is None:
@@ -4066,8 +4077,10 @@ class ApiServer:
         try:
             record  = self.__default_dataset_api_parameters (request.get_json())
             records = self.db.datasets (**record)
-            return self.default_list_response (records, formatter.format_dataset_record,
-                                               base_url = self.base_url)
+            output  = self.default_list_response (records, formatter.format_dataset_record,
+                                                  base_url = self.base_url)
+            output.headers["Access-Control-Allow-Origin"] = "*"
+            return output
         except validator.ValidationException as error:
             return self.error_400 (request, error.message, error.code)
 
@@ -6827,6 +6840,64 @@ class ApiServer:
 
         return self.response (json.dumps(files))
 
+
+    def __git_files_for_zipfly (self, filesystem_path, tree, path=""):
+        file_paths = []
+        for entry in tree:
+            # Walk the directory tree
+            if isinstance (entry, pygit2.Tree):  # pylint: disable=no-member
+                file_paths += self.__git_files_for_zipfly (filesystem_path, list(entry),
+                                                           f"{path}{entry.name}/")
+                continue
+
+            # Submodules are represented as commits.
+            if isinstance (entry, pygit2.Commit):  # pylint: disable=no-member
+                continue
+
+            relative_path = f"{path}{entry.name}"
+            absolute_path = f"{filesystem_path}/{relative_path}"
+            record = { "fs": absolute_path, "n": relative_path }
+            file_paths.append (record)
+
+        return file_paths
+
+    def api_v3_dataset_git_zip (self, request, git_uuid):
+        """Implements /v3/datasets/<git_uuid>.git/zip."""
+
+        git_repository, branch = self.__git_statistics_error_handling (request, git_uuid)
+        if isinstance (git_repository, Response):
+            return git_repository
+
+        with tempfile.TemporaryDirectory(dir = self.db.cache.storage,
+                                         prefix = "git-zip-",
+                                         delete = False) as folder:
+            git_directory  = f"{self.db.storage}/{git_uuid}.git"
+            git_repository = pygit2.clone_repository (git_directory, folder)
+
+            if not isinstance (git_repository, pygit2.Repository):
+                logging.error ("Unable to clone %s.", git_directory)
+                return self.error_500 ()
+
+            tree = git_repository.revparse_single(branch).tree # pylint: disable=no-member
+            files  = self.__git_files_for_zipfly (folder, tree)
+            writer = None
+            try:
+                zipfly_object = zipfly.ZipFly(paths = files)
+                writer = zipfly_object.generator()
+            except TypeError:
+                logging.error ("Could not ZIP files for git repository %s", git_uuid)
+                return self.error_500 ()
+
+            response = self.response (writer, mimetype="application/zip")
+            response.headers["Content-disposition"] = f"attachment; filename={git_uuid}.zip"
+
+            # Removes the temporary cloned repository. This should only be
+            # done after the request is complete.
+            response.call_on_close (lambda: shutil.rmtree (folder))
+            return response
+
+        return self.error_404 (request)
+
     def api_v3_dataset_decline (self, request, dataset_id):
         """Implements /v3/datasets/<id>/decline."""
         handler = self.default_error_handling (request, "POST", "application/json")
@@ -7340,6 +7411,46 @@ class ApiServer:
 
         return self.error_405 (["GET", "POST", "DELETE"])
 
+    def __register_file_handle (self, handle, download_url):
+        """Procedure to register a file handle."""
+
+        if self.handle_url is None:
+            return False
+
+        handle_data = { "values": [
+            { "index": self.handle_index,
+              "type": "URL",
+              "data": {
+                  "format": "string",
+                  "value": download_url
+              }
+             }]}
+        http_headers = {
+            "Accept":        "application/json",
+            "Content-Type":  "application/json",
+            "Authorization": 'Handle clientCert="true"',
+        }
+
+        try:
+            response = requests.put (f"{self.handle_url}/{handle}",
+                                     headers = http_headers,
+                                     cert    = (self.handle_certificate_path,
+                                                self.handle_private_key_path),
+                                     timeout = 60,
+                                     json    = handle_data)
+
+            if response.status_code == 201:
+                self.log.info ("Handle %s created.", handle)
+                return True
+
+            self.log.error ("Handle registration failed with %s (%s)",
+                            response.status_code, response.text)
+        except requests.exceptions.ConnectionError as error:
+            self.log.error ("Failed to create handle %s due to a connection error.", handle)
+            self.log.error ("Error: %s", error)
+
+        return False
+
     def api_v3_dataset_upload_file (self, request, dataset_id):
         """Implements /v3/datasets/<id>/upload."""
         handler = self.default_error_handling (request, "POST", "application/json")
@@ -7580,13 +7691,18 @@ class ApiServer:
             if file_size < 10000001:
                 is_image = self.__image_mimetype (output_filename) is not None
 
+            handle = f"{self.handle_prefix}/{file_uuid}"
+            if not self.__register_file_handle (handle, download_url):
+                handle = None
+
             self.db.update_file (account_uuid, file_uuid, dataset["uuid"],
                                  computed_md5  = computed_md5,
                                  download_url  = download_url,
                                  filesystem_location = output_filename,
                                  file_size     = file_size,
                                  is_image      = is_image,
-                                 is_incomplete = is_incomplete)
+                                 is_incomplete = is_incomplete,
+                                 handle        = handle)
 
             response_data = { "location": f"{self.base_url}/v3/file/{file_uuid}" }
             if is_incomplete:
@@ -8633,14 +8749,6 @@ class ApiServer:
                 self.log.error ("Failed to create account for SSI user %s.", email)
                 return self.error_500 ()
             self.log.access ("Account %s created via SSI.", account_uuid) #  pylint: disable=no-member
-            author_uuid = self.db.insert_author (
-                email        = email,
-                account_uuid = account_uuid,
-                is_active    = True,
-                is_public    = True)
-            if not author_uuid:
-                self.log.error ("Failed to link author to new account for %s.", email)
-                return self.error_500 ()
         else:
             account_uuid = account["uuid"]
 

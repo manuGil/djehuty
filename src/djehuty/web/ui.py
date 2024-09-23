@@ -366,7 +366,7 @@ def read_group_configuration (server, logger, config_files):
         if not groups:
             continue
 
-        self.log.info ("Refreshing groups configuration.")
+        logger.info ("Refreshing groups configuration.")
         server.db.delete_inferred_groups()
 
         for group in groups:
@@ -403,7 +403,40 @@ def read_group_configuration (server, logger, config_files):
                         logger.error("Cannot find account for %s.", email)
                         continue
                     server.db.insert_group_member (group_uuid, account_uuid, is_supervisor)
-    return None
+
+def write_pem_file (file_stream, contents, format_name):
+    """Writes CONTENTS to FILE_STREAM."""
+    file_stream.write(f"-----BEGIN {format_name}-----\n")
+    total_length = len(contents)
+    start = 0
+    while start < total_length:
+        file_stream.write (contents[start:start+64])
+        file_stream.write ("\n")
+        start += 64
+    file_stream.write(f"-----END {format_name}-----\n")
+
+def setup_handle_registration (server, logger):
+    """Write the Handle configuration to a file."""
+
+    handle_cache_dir = os.path.join(server.db.cache.storage, "handle-config")
+    os.makedirs (handle_cache_dir, mode=0o700, exist_ok=True)
+    if not os.path.isdir (handle_cache_dir):
+        logger.error ("Failed to create '%s'.", handle_cache_dir)
+
+    server.handle_certificate_path = os.path.join (handle_cache_dir, "certificate.pem")
+    server.handle_private_key_path = os.path.join (handle_cache_dir, "certificate.key")
+
+    config_fd = os.open (server.handle_certificate_path,
+                         os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                         0o600)
+    with open (config_fd, "w", encoding="utf-8") as file_stream:
+        write_pem_file (file_stream, server.handle_certificate, "CERTIFICATE")
+
+    config_fd = os.open (server.handle_private_key_path,
+                         os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                         0o600)
+    with open (config_fd, "w", encoding="utf-8") as file_stream:
+        write_pem_file (file_stream, server.handle_private_key, "PRIVATE KEY")
 
 def read_privilege_configuration (server, xml_root, logger):
     """Read the privileges configuration from XML_ROOT."""
@@ -536,6 +569,16 @@ def read_datacite_configuration (server, xml_root):
         server.datacite_password = config_value (datacite, "password")
         server.datacite_prefix   = config_value (datacite, "prefix")
 
+def read_handle_configuration (server, xml_root):
+    """Procedure to parse and set the Handle API configuration."""
+    handle = xml_root.find("handle")
+    if handle:
+        server.handle_url         = config_value (handle, "url")
+        server.handle_certificate = config_value (handle, "certificate")
+        server.handle_private_key = config_value (handle, "private-key")
+        server.handle_prefix      = config_value (handle, "prefix")
+        server.handle_index       = config_value (handle, "index")
+
 def read_automatic_login_configuration (server, xml_root):
     """Procedure to parse and set automatic login for development setups."""
     automatic_login_email = config_value (xml_root, "authentication/automatic-login-email")
@@ -574,9 +617,7 @@ def read_email_configuration (server, xml_root, logger):
             logger.error ("Could not configure the email subsystem:")
             logger.error ("The email port should be a numeric value.")
 
-def read_configuration_file (server, config_file, address, port, state_graph,
-                             storage, base_url, use_debugger, use_reloader,
-                             logger, config_files):
+def read_configuration_file (server, config_file, logger, config_files, config=None):
     """Procedure to parse a configuration file."""
 
     inside_reload = os.environ.get('WERKZEUG_RUN_MAIN')
@@ -584,7 +625,9 @@ def read_configuration_file (server, config_file, address, port, state_graph,
         if config_file is None:
             raise FileNotFoundError
 
-        config   = {}
+        if config is None:
+            config = {}
+
         xml_root = None
         tree = ElementTree.parse(config_file)
 
@@ -603,14 +646,23 @@ def read_configuration_file (server, config_file, address, port, state_graph,
             config["log-file"] = log_file
             configure_file_logging (log_file, inside_reload, logger)
 
+        address                 = convenience.value_or_none (config, "address")
+        port                    = convenience.value_or_none (config, "port")
         config["address"]       = config_value (xml_root, "bind-address", address, "127.0.0.1")
         config["port"]          = int(config_value (xml_root, "port", port, 8080))
-        server.base_url         = config_value (xml_root, "base-url", base_url,
-                                                f"http://{config['address']}:{config['port']}")
-        server.db.storage       = config_value (xml_root, "storage-root", storage)
-        server.db.state_graph   = config_value (xml_root, "rdf-store/state-graph", state_graph)
-        config["use_reloader"]  = config_value (xml_root, "live-reload", use_reloader)
-        config["use_debugger"]  = config_value (xml_root, "debug-mode", use_debugger)
+
+        if server.base_url is None:
+            server.base_url = f"http://{config['address']}:{config['port']}"
+
+        server.base_url         = config_value (xml_root, "base-url", None, server.base_url)
+        server.db.storage       = config_value (xml_root, "storage-root", None, server.db.storage)
+        server.db.state_graph   = config_value (xml_root, "rdf-store/state-graph", None, server.db.state_graph)
+
+        live_reload             = convenience.value_or_none (config, "live-reload")
+        config["use_reloader"]  = config_value (xml_root, "live-reload", None, live_reload)
+
+        debug_mode              = convenience.value_or_none (config, "debug-mode")
+        config["use_debugger"]  = config_value (xml_root, "debug-mode", None, debug_mode)
         config["maximum_workers"] = int(config_value (xml_root, "maximum-workers", None, 1))
 
         endpoint = config_value (xml_root, "rdf-store/sparql-uri")
@@ -764,6 +816,7 @@ def read_configuration_file (server, config_file, address, port, state_graph,
 
         read_orcid_configuration (server, xml_root)
         read_datacite_configuration (server, xml_root)
+        read_handle_configuration (server, xml_root)
         read_email_configuration (server, xml_root, logger)
         read_saml_configuration (server, xml_root, logger)
         read_automatic_login_configuration (server, xml_root)
@@ -781,17 +834,7 @@ def read_configuration_file (server, config_file, address, port, state_graph,
             if not os.path.isabs(include):
                 include = os.path.join(config_dir, include)
 
-            new_config = read_configuration_file (server,
-                                                  include,
-                                                  config["address"],
-                                                  config["port"],
-                                                  server.db.state_graph,
-                                                  server.db.storage,
-                                                  server.base_url,
-                                                  config["use_debugger"],
-                                                  config["use_reloader"],
-                                                  logger,
-                                                  config_files)
+            new_config = read_configuration_file (server, include, logger, config_files, config)
             config = { **config, **new_config }
 
         read_menu_configuration (xml_root, server)
@@ -926,7 +969,12 @@ def apply_transactions_from_directory (logger, server, config, transactions_dire
                                os.listdir(directory)))
     transactions = sorted(transactions)
 
-    print(f"Applying {len(transactions)} transactions.")
+    number_of_transactions = len(transactions)
+    if number_of_transactions < 1:
+        print("No transactions to apply.")
+        return False
+
+    print(f"Applying {number_of_transactions} transactions.")
     try:
         for transaction_file in transactions:
             filename = f"{directory}/{transaction_file}"
@@ -934,6 +982,7 @@ def apply_transactions_from_directory (logger, server, config, transactions_dire
             with open(filename, "r", encoding="utf-8") as transaction:
                 query = transaction.read()
                 server.db.sparql.update (query)
+                server.db.sparql.commit()
                 print(f"Applied {transaction.name}.")
             os.rename (filename, applied_filename)
 
@@ -953,9 +1002,7 @@ def apply_transactions_from_directory (logger, server, config, transactions_dire
 ## Starting point for the command-line program
 ## ----------------------------------------------------------------------------
 
-def main (address=None, port=None, state_graph=None, storage=None,
-          base_url=None, config_file=None, use_debugger=False,
-          use_reloader=False, run_internal_server=True, initialize=True,
+def main (config_file=None, run_internal_server=True, initialize=True,
           extract_transactions_from_log=None, apply_transactions=None):
     """The main entry point for the 'web' subcommand."""
     try:
@@ -982,10 +1029,7 @@ def main (address=None, port=None, state_graph=None, storage=None,
 
         server = wsgi.ApiServer ()
         config_files = set()
-        config = read_configuration_file (server, config_file, address, port,
-                                          state_graph, storage, base_url,
-                                          use_debugger, use_reloader, logger,
-                                          config_files)
+        config = read_configuration_file (server, config_file, logger, config_files)
 
         ## Handle extracting Query Audit Logs early on.
         if extract_transactions_from_log is not None:
@@ -1011,6 +1055,8 @@ def main (address=None, port=None, state_graph=None, storage=None,
             server.db.cache.invalidate_all ()
 
         setup_saml_service_provider (server, logger)
+        if server.handle_url is not None:
+            setup_handle_registration (server, logger)
 
         if not server.in_production and not inside_reload:
             logger.warning ("Assuming to run in a non-production environment.")
@@ -1080,7 +1126,10 @@ def main (address=None, port=None, state_graph=None, storage=None,
             logger.info ("Secondary storage path:  %s", server.db.secondary_storage)
             logger.info ("Cache storage path:      %s", server.db.cache.storage)
             logger.info ("Static pages loaded:     %s", len(server.static_pages))
-            logger.info ("Running on %s", server.base_url)
+            if server.handle_url is None:
+                logger.info ("Handle registration is disabled.")
+            else:
+                logger.info ("Handle prefix:           %s", server.handle_prefix)
 
             if server.identity_provider is not None:
                 logger.info ("Using %s as identity provider.",
@@ -1107,6 +1156,10 @@ def main (address=None, port=None, state_graph=None, storage=None,
 
             if initialize:
                 if not server.db.state_graph_is_initialized ():
+                    if not server.db.sparql_is_up:
+                        logger.error ("Cannot initialize because the SPARQL endpoint is down.")
+                        return None
+
                     logger.info ("Invalidating caches ...")
                     server.db.cache.invalidate_all ()
                     logger.info ("Initializing RDF store ...")
@@ -1127,7 +1180,7 @@ def main (address=None, port=None, state_graph=None, storage=None,
                     logger.warning ("Empty the state-graph to re-initialize.")
 
         if not inside_reload:
-            read_group_configuration(server, logger, config_files)
+            read_group_configuration (server, logger, config_files)
 
         run_simple (config["address"], config["port"], server,
                     threaded=(config["maximum_workers"] <= 1),
