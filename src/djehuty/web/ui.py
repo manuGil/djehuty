@@ -366,6 +366,9 @@ def read_group_configuration (server, logger, config_files):
         if not groups:
             continue
 
+        self.log.info ("Refreshing groups configuration.")
+        server.db.delete_inferred_groups()
+
         for group in groups:
             group_name = group.attrib["name"]
             group_id = group.attrib["id"]
@@ -1124,7 +1127,6 @@ def main (address=None, port=None, state_graph=None, storage=None,
                     logger.warning ("Empty the state-graph to re-initialize.")
 
         if not inside_reload:
-            server.db.delete_inferred_groups()
             read_group_configuration(server, logger, config_files)
 
         run_simple (config["address"], config["port"], server,
