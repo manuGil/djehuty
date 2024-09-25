@@ -26,7 +26,7 @@ SELECT DISTINCT ?account_uuid ?citation ?confidential_reason ?container_uuid
                 ?totals_created_at ?total_downloads ?total_views ?total_shares
                 ?total_cites ?git_uuid ?agreed_to_deposit_agreement ?agreed_to_publish
                 ?private_link_is_expired ?is_shared_with_me ?anonymize
-                ?git_repository_name ?git_code_hosting_url
+                ?git_repository_name ?git_code_hosting_url ?group_name
 {%endif%}
 WHERE {
   GRAPH <{{state_graph}}> {
@@ -150,7 +150,14 @@ WHERE {
     OPTIONAL { ?dataset djht:agreed_to_publish     ?agreed_to_publish . }
     OPTIONAL { ?dataset djht:git_repository_name   ?git_repository_name . }
     OPTIONAL { ?dataset djht:git_code_hosting_url  ?git_code_hosting_url . }
-
+    OPTIONAL {
+      ?dataset   djht:association_criteria  ?association_criteria .
+    }
+    OPTIONAL {
+      ?group_uri rdf:type                   djht:InstitutionGroup .
+      ?group_uri djht:association_criteria  ?association_criteria .
+      ?group_uri djht:name                  ?group_name .
+    }
     ?container_uri      djht:account              ?account .
     {%- if not disable_collaboration %}
     OPTIONAL {
@@ -159,8 +166,6 @@ WHERE {
       ?collaborator       djht:account        ?collaborator_account .
     }
     OPTIONAL {
-      ?group_uri          rdf:type djht:InstitutionGroup .
-      ?account            djht:group    ?group_uri .
       ?group_uri          djht:members/rdf:rest*/rdf:first ?member_uri .
       ?member_uri         djht:is_supervisor "true"^^xsd:boolean .
       ?member_uri         djht:account ?member_account .

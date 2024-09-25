@@ -386,6 +386,7 @@ def read_group_configuration (server, logger, config_files):
                 if account is not None:
                     logger.info("Account %s already exists.", email)
                     server.db.insert_group_member (group_uuid, account["uuid"], is_supervisor)
+                    server.db.update_account (account["uuid"], domain=domain)
                 else:
                     logger.info("Account %s does not exist.", email)
                     first_name = member.attrib.get("first_name")
@@ -398,7 +399,8 @@ def read_group_configuration (server, logger, config_files):
                         email       = email,
                         first_name  = first_name,
                         last_name   = last_name,
-                        common_name = common_name)
+                        common_name = common_name,
+                        domain      = domain)
                     if account_uuid is None:
                         logger.error("Cannot find account for %s.", email)
                         continue

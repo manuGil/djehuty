@@ -1254,6 +1254,14 @@ class SparqlInterface:
         container       = self.container_uri (graph, container_uri, "dataset", account_uuid)
         account_uri     = URIRef(rdf.uuid_to_uri (account_uuid, "account"))
 
+
+        # Look up the account's group.
+        association_criteria = None
+        try:
+            association_criteria = self.group (account_uuid=account_uuid)[0]["association"]
+        except (IndexError, KeyError):
+            pass
+
         ## TIMELINE
         ## --------------------------------------------------------------------
         self.insert_timeline (
@@ -1313,6 +1321,7 @@ class SparqlInterface:
         rdf.add (graph, uri, rdf.DJHT["data_link"],      data_link,      XSD.string)
         rdf.add (graph, uri, rdf.DJHT["thumb"],          thumb,          XSD.string)
         rdf.add (graph, uri, rdf.DJHT["thumb_origin"],   thumb_origin,   XSD.string)
+        rdf.add (graph, uri, rdf.DJHT["association_criteria"], association_criteria, XSD.string)
 
         current_time = datetime.strftime (datetime.now(), "%Y-%m-%dT%H:%M:%SZ")
         rdf.add (graph, uri, rdf.DJHT["created_date"],   current_time, XSD.dateTime)
@@ -1553,7 +1562,6 @@ class SparqlInterface:
         graph        = Graph()
         account_uri  = rdf.unique_node ("account")
 
-        domain       = None
         if domain is None and email is not None:
             domain = email.partition("@")[2]
 
@@ -2853,7 +2861,7 @@ class SparqlInterface:
         roots = sorted (roots, key = lambda field: field["title"])
         return roots
 
-    def group (self, group_id=None, parent_id=None, name=None,
+    def group (self, group_id=None, parent_id=None, name=None, account_uuid=None,
                association=None, limit=None, offset=None, is_featured=None,
                order=None, order_direction=None, starts_with=False):
         """Procedure to return group information."""
@@ -2873,11 +2881,13 @@ class SparqlInterface:
         filters += rdf.sparql_filter ("is_featured", is_featured)
 
         query = self.__query_from_template ("group", {
-            "filters":     filters
+            "account_uuid": account_uuid,
+            "filters":      filters
         })
 
         query += rdf.sparql_suffix (order, order_direction, limit, offset)
 
+        self.__log_query (query)
         return self.__run_query (query, query, "group")
 
     def group_by_name (self, group_name, startswith=False):
