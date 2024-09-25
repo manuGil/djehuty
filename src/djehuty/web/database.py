@@ -1451,6 +1451,7 @@ class SparqlInterface:
             "created_date":          created_date
         })
 
+        self.cache.invalidate_by_prefix ("group")
         self.cache.invalidate_by_prefix ("accounts")
 
         results = self.__run_logged_query (query)
