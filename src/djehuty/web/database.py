@@ -477,6 +477,7 @@ class SparqlInterface:
 
         if not return_count:
             query += rdf.sparql_suffix (order, order_direction, limit, offset)
+        self.__log_query(query)
 
         if use_cache:
             cache_prefix = f"datasets_{account_uuid}" if account_uuid is not None else "datasets"
