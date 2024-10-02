@@ -324,7 +324,7 @@ function render_collaborators_for_dataset (dataset_uuid, may_edit_metadata, call
             row += collaborator.data_edit ? ' checked="checked"' : '';
             row += `></td><td class="type-end"><input class="subitem-checkbox-data" name="remove" type="checkbox"${supervisor_disabled}`;
             row += collaborator.data_remove ? ' checked="checked"' : '';
-            row += '></td><td>';
+            row += `><input type="hidden" class="contributor-uuid" value="${collaborator.account_uuid}"></td><td>`;
             if (may_edit_metadata && !collaborator.is_inferred && !collaborator.is_supervisor) {
                 row += '<a href="#"';
                 row += `onclick="javascript:remove_collaborator('${encodeURIComponent(collaborator.uuid)}', `;

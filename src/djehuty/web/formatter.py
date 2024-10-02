@@ -9,6 +9,7 @@ def format_collaborator_record (record):
     """Record formatter for collaborators"""
     return {
         "uuid":           conv.value_or_none(record, "uuid"),
+        "account_uuid":   conv.value_or_none(record, "account_uuid"),
         "first_name":     conv.value_or_none(record, "first_name"),
         "last_name":      conv.value_or_none(record, "last_name"),
         "email":          conv.value_or_none(record, "email"),
